@@ -42,7 +42,7 @@ class _AsadAppState extends State<AsadApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ASAD | منظومة الحضور والغياب الذكي',
+      title: 'ASAD',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       locale: const Locale('ar'),

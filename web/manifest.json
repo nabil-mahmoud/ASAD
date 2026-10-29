@@ -1,11 +1,11 @@
 {
-    "name": "asad_app",
-    "short_name": "asad_app",
+    "name": "ASAD",
+    "short_name": "ASAD",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#064E3B",
+    "theme_color": "#059669",
+    "description": "منظومة ASAD لتسجيل الحضور والغياب الذكي بدون إنترنت",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

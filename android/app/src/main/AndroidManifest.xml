@@ -5,7 +5,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
     <application
-        android:label="asad_app"
+        android:label="ASAD"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
