@@ -17,6 +17,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
   Course? _selectedCourse;
   String _selectedSessionType = 'lecture'; // 'lecture' | 'lab_practical' | 'lab_theory'
   String? _selectedLocation;
+  List<String> _courseLocations = [];
   bool _isLaunching = false;
 
   @override
@@ -25,7 +26,26 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
     if (_appState.courses.isNotEmpty) {
       _selectedCourse = _appState.courses.first;
       _adjustForCourseTeachingType();
+      _updateLocationsForSelectedCourse();
     }
+  }
+
+  Future<void> _updateLocationsForSelectedCourse() async {
+    if (_selectedCourse == null) {
+      setState(() => _courseLocations = []);
+      return;
+    }
+    final locs = await _appState.getLocationsForCourse(
+      gradeYear: _selectedCourse!.gradeYear,
+      department: _selectedCourse!.department,
+    );
+    if (!mounted) return;
+    setState(() {
+      _courseLocations = locs;
+      if (_selectedLocation == null || !locs.contains(_selectedLocation)) {
+        _selectedLocation = locs.isNotEmpty ? locs.first : null;
+      }
+    });
   }
 
   void _adjustForCourseTeachingType() {
@@ -34,11 +54,6 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
       // Force lecture type only
       _selectedSessionType = 'lecture';
       _selectedLocation = null;
-    } else {
-      // Practical default location
-      if (_selectedLocation == null && _appState.uniqueLocations.isNotEmpty) {
-        _selectedLocation = _appState.uniqueLocations.first;
-      }
     }
   }
 
@@ -86,7 +101,6 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
   @override
   Widget build(BuildContext context) {
     final courses = _appState.courses;
-    final locations = _appState.uniqueLocations;
 
     return Scaffold(
       appBar: AppBar(
@@ -126,6 +140,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                           _selectedCourse = course;
                           _adjustForCourseTeachingType();
                         });
+                        _updateLocationsForSelectedCourse();
                       },
                     ),
                   ),
@@ -173,7 +188,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                       stepNumber: 3,
                       title: 'تحديد المكان المخصص (المعمل / القاعة)',
                       subtitle: 'سيقيد النظام قبول المسح بطلاب هذا المكان فقط لمنع التسلل والخلط',
-                      child: locations.isEmpty
+                      child: _courseLocations.isEmpty
                           ? Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
@@ -182,7 +197,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                                 border: Border.all(color: AppColors.warningYellow.withOpacity(0.4)),
                               ),
                               child: const Text(
-                                'تنبيه: لا توجد أماكن معرفة في كشف الطلاب حالياً. يمكنك كتابة المكان أدناه.',
+                                'تنبيه: لا توجد أماكن مسجلة لطلاب هذا القسم/الفرقة في كشف الطلاب المستورد.',
                                 style: TextStyle(fontSize: 12, color: AppColors.warningYellow),
                               ),
                             )
@@ -190,12 +205,15 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 DropdownButtonFormField<String>(
-                                  value: _selectedLocation ?? (locations.isNotEmpty ? locations.first : null),
+                                  value: _courseLocations.contains(_selectedLocation)
+                                      ? _selectedLocation
+                                      : (_courseLocations.isNotEmpty ? _courseLocations.first : null),
                                   isExpanded: true,
                                   decoration: const InputDecoration(
                                     prefixIcon: Icon(Icons.meeting_room_rounded, color: AppColors.emerald),
                                   ),
-                                  items: locations.map((loc) {
+                                  hint: const Text('اختر المكان المخصص للدرس العملي', style: TextStyle(fontSize: 13)),
+                                  items: _courseLocations.map((loc) {
                                     return DropdownMenuItem<String>(
                                       value: loc,
                                       child: Text(
@@ -207,11 +225,6 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                                   onChanged: (loc) {
                                     setState(() => _selectedLocation = loc);
                                   },
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'أمثلة: معمل برمجة أ، معمل شبكات ب، قاعة 3',
-                                  style: TextStyle(fontSize: 11, color: AppColors.textDim),
                                 ),
                               ],
                             ),
@@ -334,8 +347,8 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
           _selectedSessionType = id;
           if (id == 'lecture') {
             _selectedLocation = null;
-          } else if (_selectedLocation == null && _appState.uniqueLocations.isNotEmpty) {
-            _selectedLocation = _appState.uniqueLocations.first;
+          } else if (_selectedLocation == null && _courseLocations.isNotEmpty) {
+            _selectedLocation = _courseLocations.first;
           }
         });
       },

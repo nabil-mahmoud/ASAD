@@ -54,8 +54,16 @@ class AppState extends ChangeNotifier {
   int _totalStudents = 0;
   int get totalStudents => _totalStudents;
 
+  List<String> _uniqueGradeYears = [];
+  List<String> get uniqueGradeYears => _uniqueGradeYears;
+
+  List<String> _uniqueDepartments = [];
+  List<String> get uniqueDepartments => _uniqueDepartments;
+
   List<String> _uniqueLocations = [];
   List<String> get uniqueLocations => _uniqueLocations;
+
+  bool get hasImportedStudents => _totalStudents > 0 && _uniqueGradeYears.isNotEmpty;
 
   // Active Session state
   Session? _activeSession;
@@ -95,8 +103,27 @@ class AppState extends ChangeNotifier {
     _courses = await _db.getCourses();
     _sessions = await _db.getSessions();
     _totalStudents = await _db.getTotalStudentsCount();
+    _uniqueGradeYears = await _db.getAllUniqueGradeYears();
+    _uniqueDepartments = await _db.getAllUniqueDepartments();
     _uniqueLocations = await _db.getAllUniqueLocations();
     notifyListeners();
+  }
+
+  Future<List<String>> getDepartmentsForGrade(String gradeYear) async {
+    return await _db.getAllUniqueDepartments(gradeYear: gradeYear);
+  }
+
+  Future<List<String>> getLocationsForCourse({
+    required String gradeYear,
+    required String department,
+  }) async {
+    final list = await _db.getAllUniqueLocations(
+      gradeYear: gradeYear,
+      department: department,
+    );
+    if (list.isNotEmpty) return list;
+    // Fallback to all locations if specific combination has none
+    return _uniqueLocations;
   }
 
   // Doctor Profile
@@ -150,14 +177,30 @@ class AppState extends ChangeNotifier {
     final sessionId = await _db.createSession(newSession);
     final launchedSession = newSession.copyWith(sessionId: sessionId);
 
-    // Filter target students roster based on session type and location
+    // Filter target students roster based on session type and course/location
     List<Student> targetStudents;
     if (sessionType == 'lecture') {
-      // General lecture: all students in that grade/department or whole roster
-      targetStudents = await _db.getStudents();
+      // General lecture: students of this grade and department
+      targetStudents = await _db.getStudents(
+        gradeYear: course.gradeYear,
+        department: course.department,
+      );
+      if (targetStudents.isEmpty) {
+        targetStudents = await _db.getStudents(gradeYear: course.gradeYear);
+      }
+      if (targetStudents.isEmpty) {
+        targetStudents = await _db.getStudents();
+      }
     } else {
       // Practical / lab: restricted to the selected location
-      targetStudents = await _db.getStudents(location: location);
+      targetStudents = await _db.getStudents(
+        location: location,
+        gradeYear: course.gradeYear,
+        department: course.department,
+      );
+      if (targetStudents.isEmpty) {
+        targetStudents = await _db.getStudents(location: location);
+      }
     }
 
     // Initialize attendance roster as 'absent'

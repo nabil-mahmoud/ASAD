@@ -589,22 +589,4 @@ class ExcelPdfExporter {
     }
     return '';
   }
-
-  /// Official Approved Demo Students Data (عينة الطلاب المعتمدة للتجربة الفورية)
-  static List<Student> getApprovedDemoStudents() {
-    return const [
-      Student(academicId: '20261001', fullName: 'أحمد محمد إبراهيم', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'مدرج 1'),
-      Student(academicId: '20261002', fullName: 'محمود حسن السيد', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'معمل برمجة أ'),
-      Student(academicId: '20261003', fullName: 'سارة علي المنشاوي', gradeYear: 'الفرقة الثانية', department: 'نظم معلومات', location: 'معمل شبكات ب'),
-      Student(academicId: '20261004', fullName: 'كريم عادل فهمي', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'معمل برمجة أ'),
-      Student(academicId: '20261005', fullName: 'يوسف محمود رجب', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'معمل برمجة أ'),
-      Student(academicId: '20261006', fullName: 'نورهان خالد العطار', gradeYear: 'الفرقة الثانية', department: 'نظم معلومات', location: 'معمل شبكات ب'),
-      Student(academicId: '20261007', fullName: 'عمر طارق الشافعي', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'مدرج 1'),
-      Student(academicId: '20261008', fullName: 'منى عبد الرحمن حسن', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'معمل برمجة أ'),
-      Student(academicId: '20261009', fullName: 'زياد شريف عبد الله', gradeYear: 'الفرقة الثانية', department: 'علوم حاسب', location: 'معمل برمجة أ'),
-      Student(academicId: '20261010', fullName: 'مريم مصطفى الجوهري', gradeYear: 'الفرقة الثانية', department: 'نظم معلومات', location: 'معمل شبكات ب'),
-      Student(academicId: '20261011', fullName: 'حسام الدين نبيل', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'مدرج 1'),
-      Student(academicId: '20261012', fullName: 'فاطمة الزهراء شحاتة', gradeYear: 'الفرقة الثانية', department: 'حاسبات', location: 'معمل برمجة أ'),
-    ];
-  }
 }

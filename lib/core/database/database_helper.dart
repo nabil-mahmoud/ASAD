@@ -173,26 +173,39 @@ class DatabaseHelper {
   }
 
   // ---------------- Students Operations ----------------
-  Future<List<Student>> getStudents({String? location, String? query}) async {
+  Future<List<Student>> getStudents({
+    String? location,
+    String? gradeYear,
+    String? department,
+    String? query,
+  }) async {
     final db = await database;
-    String? whereClause;
-    List<dynamic>? whereArgs;
+    List<String> conditions = [];
+    List<dynamic> whereArgs = [];
 
-    if (location != null && location.isNotEmpty && query != null && query.isNotEmpty) {
-      whereClause = 'location = ? AND (full_name LIKE ? OR academic_id LIKE ?)';
-      whereArgs = [location, '%$query%', '%$query%'];
-    } else if (location != null && location.isNotEmpty) {
-      whereClause = 'location = ?';
-      whereArgs = [location];
-    } else if (query != null && query.isNotEmpty) {
-      whereClause = 'full_name LIKE ? OR academic_id LIKE ? OR location LIKE ?';
-      whereArgs = ['%$query%', '%$query%', '%$query%'];
+    if (location != null && location.trim().isNotEmpty) {
+      conditions.add('location = ?');
+      whereArgs.add(location.trim());
     }
+    if (gradeYear != null && gradeYear.trim().isNotEmpty) {
+      conditions.add('grade_year = ?');
+      whereArgs.add(gradeYear.trim());
+    }
+    if (department != null && department.trim().isNotEmpty) {
+      conditions.add('department = ?');
+      whereArgs.add(department.trim());
+    }
+    if (query != null && query.trim().isNotEmpty) {
+      conditions.add('(full_name LIKE ? OR academic_id LIKE ? OR location LIKE ?)');
+      whereArgs.addAll(['%$query%', '%$query%', '%$query%']);
+    }
+
+    final whereClause = conditions.isNotEmpty ? conditions.join(' AND ') : null;
 
     final res = await db.query(
       'Students',
       where: whereClause,
-      whereArgs: whereArgs,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
       orderBy: 'academic_id ASC',
     );
     return res.map((m) => Student.fromMap(m)).toList();
@@ -212,12 +225,42 @@ class DatabaseHelper {
     return null;
   }
 
-  Future<List<String>> getAllUniqueLocations() async {
+  Future<List<String>> getAllUniqueGradeYears() async {
     final db = await database;
     final res = await db.rawQuery(
-      'SELECT DISTINCT location FROM Students WHERE location IS NOT NULL AND location != "" ORDER BY location ASC',
+      'SELECT DISTINCT grade_year FROM Students WHERE grade_year IS NOT NULL AND TRIM(grade_year) != "" ORDER BY grade_year ASC',
     );
-    return res.map((r) => r['location'] as String).toList();
+    return res.map((r) => (r['grade_year'] as String).trim()).toList();
+  }
+
+  Future<List<String>> getAllUniqueDepartments({String? gradeYear}) async {
+    final db = await database;
+    String query = 'SELECT DISTINCT department FROM Students WHERE department IS NOT NULL AND TRIM(department) != ""';
+    List<dynamic> args = [];
+    if (gradeYear != null && gradeYear.trim().isNotEmpty) {
+      query += ' AND grade_year = ?';
+      args.add(gradeYear.trim());
+    }
+    query += ' ORDER BY department ASC';
+    final res = await db.rawQuery(query, args);
+    return res.map((r) => (r['department'] as String).trim()).toList();
+  }
+
+  Future<List<String>> getAllUniqueLocations({String? gradeYear, String? department}) async {
+    final db = await database;
+    String query = 'SELECT DISTINCT location FROM Students WHERE location IS NOT NULL AND TRIM(location) != ""';
+    List<dynamic> args = [];
+    if (gradeYear != null && gradeYear.trim().isNotEmpty) {
+      query += ' AND grade_year = ?';
+      args.add(gradeYear.trim());
+    }
+    if (department != null && department.trim().isNotEmpty) {
+      query += ' AND department = ?';
+      args.add(department.trim());
+    }
+    query += ' ORDER BY location ASC';
+    final res = await db.rawQuery(query, args);
+    return res.map((r) => (r['location'] as String).trim()).toList();
   }
 
   Future<int> batchInsertStudents(List<Student> students) async {

@@ -94,21 +94,6 @@ class _Screen3ImporterState extends State<Screen3Importer> {
     }
   }
 
-  Future<void> _loadApprovedDemoData() async {
-    setState(() => _isLoading = true);
-    final demo = ExcelPdfExporter.getApprovedDemoStudents();
-    await _appState.importStudents(demo);
-    await _loadData();
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم تحميل عينة الطلاب المعتمدة للتجربة الفورية بنجاح.'),
-        backgroundColor: AppColors.emerald,
-      ),
-    );
-  }
-
   Future<void> _downloadTemplate() async {
     final file = await ExcelPdfExporter.generateImportTemplate();
     await ExcelPdfExporter.shareFile(file, 'قالب استيراد طلاب الدفعة - ASAD');
@@ -179,17 +164,17 @@ class _Screen3ImporterState extends State<Screen3Importer> {
                         ),
                         onPressed: _isLoading ? null : _pickAndImportExcel,
                         icon: const Icon(Icons.upload_file_rounded),
-                        label: const Text('استيراد شيت إكسيل (XLSX)'),
+                        label: const Text('استيراد شيت إكسيل الطلاب (XLSX)'),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                       ),
-                      onPressed: _isLoading ? null : _loadApprovedDemoData,
-                      icon: const Icon(Icons.flash_on_rounded, color: AppColors.mintAccent),
-                      label: const Text('عينة معتمدة'),
+                      onPressed: _downloadTemplate,
+                      icon: const Icon(Icons.download_rounded, color: AppColors.mintAccent),
+                      label: const Text('قالب فارغ'),
                     ),
                   ],
                 ),
@@ -294,15 +279,15 @@ class _Screen3ImporterState extends State<Screen3Importer> {
                               ),
                               const SizedBox(height: 8),
                               const Text(
-                                'قم باستيراد ملف شؤون الطلاب (Excel) أو اضغط على "عينة معتمدة" للبدء الفوري.',
+                                'قم باستيراد ملف كشف الطلاب من شؤون الطلاب (Excel) لتسجيل وتحديث الفرق والأقسام والأماكن المعتمدة تلقائياً.',
                                 style: TextStyle(fontSize: 13, color: AppColors.textMuted),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
                               ElevatedButton.icon(
-                                onPressed: _loadApprovedDemoData,
-                                icon: const Icon(Icons.bolt_rounded),
-                                label: const Text('تحميل العينة المعتمدة فوراً'),
+                                onPressed: _pickAndImportExcel,
+                                icon: const Icon(Icons.upload_file_rounded),
+                                label: const Text('استيراد شيت الطلاب الآن (XLSX)'),
                               ),
                             ],
                           ),

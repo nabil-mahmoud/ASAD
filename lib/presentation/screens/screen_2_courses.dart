@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/course.dart';
 import '../controllers/app_state.dart';
+import 'screen_3_importer.dart';
 
 class Screen2Courses extends StatefulWidget {
   const Screen2Courses({super.key});
@@ -30,13 +31,60 @@ class _Screen2CoursesState extends State<Screen2Courses> {
   }
 
   void _showAddEditCourseModal({Course? existingCourse}) {
-    final nameCtrl = TextEditingController(text: existingCourse?.courseName ?? '');
-    String selectedGrade = existingCourse?.gradeYear ?? 'الفرقة الثانية';
-    String selectedDept = existingCourse?.department ?? 'حاسبات';
-    String selectedType = existingCourse?.teachingType ?? 'theory_and_practical';
+    if (!_appState.hasImportedStudents) {
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.warningYellow),
+              SizedBox(width: 8),
+              Text('تنبيه هام'),
+            ],
+          ),
+          content: const Text(
+            'يرجى استيراد كشف الطلاب أولاً لتحميل الفرق والأقسام المعتمدة.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('إلغاء'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(c);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const Screen3Importer()),
+                );
+              },
+              icon: const Icon(Icons.upload_file_rounded),
+              label: const Text('استيراد كشف الطلاب'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
-    final grades = ['الفرقة الأولى', 'الفرقة الثانية', 'الفرقة الثالثة', 'الفرقة الرابعة', 'دراسات عليا'];
-    final depts = ['حاسبات', 'نظم معلومات', 'علوم حاسب', 'تكنولوجيا المعلومات', 'عام'];
+    final nameCtrl = TextEditingController(text: existingCourse?.courseName ?? '');
+    
+    // Dynamic single source of truth from Students table
+    final grades = List<String>.from(_appState.uniqueGradeYears);
+    final depts = List<String>.from(_appState.uniqueDepartments);
+
+    String selectedGrade = existingCourse?.gradeYear ?? (grades.isNotEmpty ? grades.first : '');
+    if (selectedGrade.isNotEmpty && !grades.contains(selectedGrade)) {
+      grades.insert(0, selectedGrade);
+    }
+
+    String selectedDept = existingCourse?.department ?? (depts.isNotEmpty ? depts.first : '');
+    if (selectedDept.isNotEmpty && !depts.contains(selectedDept)) {
+      depts.insert(0, selectedDept);
+    }
+
+    String selectedType = existingCourse?.teachingType ?? 'theory_and_practical';
 
     showModalBottomSheet(
       context: context,
@@ -92,7 +140,7 @@ class _Screen2CoursesState extends State<Screen2Courses> {
                     ),
                     const SizedBox(height: 16),
 
-                    // الفرقة والقسم
+                    // الفرقة والقسم مستخرجة ديناميكياً من شيت الطلاب
                     Row(
                       children: [
                         Expanded(
@@ -102,11 +150,16 @@ class _Screen2CoursesState extends State<Screen2Courses> {
                               const Text('الفرقة الدراسية', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.mintAccent)),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                value: selectedGrade,
+                                value: selectedGrade.isNotEmpty ? selectedGrade : null,
                                 isExpanded: true,
                                 decoration: const InputDecoration(),
+                                hint: const Text('اختر الفرقة', style: TextStyle(fontSize: 13)),
                                 items: grades.map((g) => DropdownMenuItem(value: g, child: Text(g, style: const TextStyle(fontSize: 13)))).toList(),
-                                onChanged: (val) => setModalState(() => selectedGrade = val!),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setModalState(() => selectedGrade = val);
+                                  }
+                                },
                               ),
                             ],
                           ),
@@ -119,11 +172,16 @@ class _Screen2CoursesState extends State<Screen2Courses> {
                               const Text('القسم العلمي', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.mintAccent)),
                               const SizedBox(height: 6),
                               DropdownButtonFormField<String>(
-                                value: selectedDept,
+                                value: selectedDept.isNotEmpty ? selectedDept : null,
                                 isExpanded: true,
                                 decoration: const InputDecoration(),
+                                hint: const Text('اختر القسم', style: TextStyle(fontSize: 13)),
                                 items: depts.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 13)))).toList(),
-                                onChanged: (val) => setModalState(() => selectedDept = val!),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setModalState(() => selectedDept = val);
+                                  }
+                                },
                               ),
                             ],
                           ),
@@ -286,50 +344,49 @@ class _Screen2CoursesState extends State<Screen2Courses> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.library_books_outlined, size: 64, color: AppColors.textDim),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'لم يتم إضافة أي مقررات بعد',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textLight),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'أضف مقرراتك الدراسية يدوياً لتبدأ تسجيل الحضور والغياب للطلاب فوراً.',
-                      style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: () => _showAddEditCourseModal(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('إضافة مقرر جديد الآن'),
-                    ),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        // Populate quick demo courses
-                        await _appState.addCourse(const Course(
-                          courseName: 'شبكات الحاسب',
-                          gradeYear: 'الفرقة الثانية',
-                          department: 'حاسبات',
-                          teachingType: 'theory_and_practical',
-                        ));
-                        await _appState.addCourse(const Course(
-                          courseName: 'هندسة البرمجيات',
-                          gradeYear: 'الفرقة الثانية',
-                          department: 'حاسبات',
-                          teachingType: 'theory_and_practical',
-                        ));
-                        await _appState.addCourse(const Course(
-                          courseName: 'أخلاقيات المهنة',
-                          gradeYear: 'الفرقة الثانية',
-                          department: 'عام',
-                          teachingType: 'theory_only',
-                        ));
-                      },
-                      icon: const Icon(Icons.auto_awesome),
-                      label: const Text('إضافة مقررات نموذجية للتجربة'),
-                    ),
+                    if (!_appState.hasImportedStudents) ...[
+                      const Icon(Icons.warning_amber_rounded, size: 64, color: AppColors.warningYellow),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'كشف الطلاب غير مستورد بعد',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textLight),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'يرجى استيراد كشف الطلاب أولاً لتحميل الفرق والأقسام المعتمدة.',
+                        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const Screen3Importer()),
+                          );
+                        },
+                        icon: const Icon(Icons.upload_file_rounded),
+                        label: const Text('الانتقال لاستيراد كشف الطلاب (XLSX)'),
+                      ),
+                    ] else ...[
+                      const Icon(Icons.library_books_outlined, size: 64, color: AppColors.textDim),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'لم يتم إضافة أي مقررات بعد',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textLight),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'أضف مقرراتك الدراسية مستعيناً بالفرق والأقسام المعتمدة في كشف الطلاب.',
+                        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddEditCourseModal(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('إضافة مقرر دراسي جديد'),
+                      ),
+                    ],
                   ],
                 ),
               ),

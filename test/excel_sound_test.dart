@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:asad_app/core/sound/sound_service.dart';
-import 'package:asad_app/core/utils/excel_pdf_exporter.dart';
 import 'package:asad_app/domain/models/student.dart';
+import 'package:asad_app/domain/models/course.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -9,19 +9,10 @@ void main() {
   test('SoundService initializes and synthesizes offline WAV tones', () async {
     final sound = SoundService();
     await sound.init();
-    // Verify playing triggers without uncaught exception
     expect(() => sound.playSuccessBeep(), returnsNormally);
     expect(() => sound.playDuplicateAlert(), returnsNormally);
     expect(() => sound.playWrongLocationBuzz(), returnsNormally);
     expect(() => sound.playManualConfirmClick(), returnsNormally);
-  });
-
-  test('Excel Template generation and Approved Demo Students test', () async {
-    final demoStudents = ExcelPdfExporter.getApprovedDemoStudents();
-    expect(demoStudents.length, greaterThanOrEqualTo(8));
-    expect(demoStudents.any((s) => s.fullName.contains('أحمد محمد إبراهيم')), isTrue);
-    expect(demoStudents.any((s) => s.location == 'معمل برمجة أ'), isTrue);
-    expect(demoStudents.any((s) => s.location == 'معمل شبكات ب'), isTrue);
   });
 
   test('Student model serialization and location index compliance', () {
@@ -41,5 +32,19 @@ void main() {
     expect(revived.academicId, student.academicId);
     expect(revived.fullName, student.fullName);
     expect(revived.location, student.location);
+  });
+
+  test('Course model dynamic properties compliance', () {
+    const course = Course(
+      courseId: 5,
+      courseName: 'نظم تشغيل',
+      gradeYear: 'الفرقة الثالثة',
+      department: 'علوم حاسب',
+      teachingType: 'theory_only',
+    );
+
+    expect(course.isTheoryOnly, isTrue);
+    expect(course.hasPractical, isFalse);
+    expect(course.teachingTypeArabic, 'نظري فقط');
   });
 }

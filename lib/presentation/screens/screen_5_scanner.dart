@@ -447,65 +447,6 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             ),
           ),
 
-          // 5. Quick Test / Simulator Drawer (For Mac Desktop & Testing with One Tap)
-          Positioned(
-            bottom: 84,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceDark.withOpacity(0.94),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.surfaceCardBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.sim_card_outlined, size: 14, color: AppColors.mintAccent),
-                      const SizedBox(width: 6),
-                      Text(
-                        'مسح تجريبي فوري للكارنيهات (للتجربة السريعة):',
-                        style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.8), fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _appState.activeSessionRecords.take(6).map((rec) {
-                        final isPresent = rec.score > 0;
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: ActionChip(
-                            backgroundColor: isPresent ? AppColors.royalDark : AppColors.surfaceCard,
-                            side: BorderSide(color: isPresent ? AppColors.emerald : AppColors.surfaceCardBorder),
-                            avatar: Icon(
-                              isPresent ? Icons.check : Icons.qr_code,
-                              size: 14,
-                              color: isPresent ? AppColors.mintAccent : Colors.white70,
-                            ),
-                            label: Text(
-                              '${rec.studentName?.split(' ').first ?? rec.academicId} (${rec.academicId})',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isPresent ? AppColors.mintAccent : Colors.white,
-                              ),
-                            ),
-                            onPressed: () => _handleBarcodeDetected(rec.academicId),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
 
           // 6. Bottom Finish & Save Bar
           Positioned(
@@ -591,7 +532,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'يمكنك استخدام شرائح المسح التجريبية أدناه أو نافذة التحضير اليدوي',
+              'يمكنك استخدام نافذة التحضير اليدوي والأعذار بالأعلى للبحث والرصد',
               style: TextStyle(color: AppColors.mintAccent, fontSize: 12),
             ),
           ],
