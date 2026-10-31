@@ -33,18 +33,20 @@ class ScanFeedbackOverlay extends StatelessWidget {
         borderColor = AppColors.warningYellow;
         bannerColor = AppColors.warningYellow;
         icon = Icons.warning_amber_rounded;
-        title = 'مسجل مسبقاً بالجلسة';
-        subtitle = '${result!.student?.fullName ?? result!.academicId} مسجل بالفعل';
+        title = 'الطالب مسجل بالفعل في هذه الجلسة';
+        subtitle = '${result!.student?.fullName ?? result!.academicId} مسجل مسبقاً';
         break;
 
       case ScanFeedbackType.wrongLocation:
         borderColor = AppColors.dangerRed;
         bannerColor = AppColors.dangerRed;
         icon = Icons.cancel_rounded;
-        title = 'طالب غير مسجل بالمكان';
+        title = 'طالب غير مقيد في هذا المكان / المقرر';
         subtitle = result!.actualLocation != null
             ? 'المكان الفعلي للطالب: ${result!.actualLocation}'
-            : result!.message;
+            : (result!.student != null
+                ? 'الاسم: ${result!.student!.fullName} - كود: ${result!.academicId}'
+                : 'الكود ${result!.academicId} غير مقيد بكشوف الطلاب');
         break;
 
       case ScanFeedbackType.manualSuccess:

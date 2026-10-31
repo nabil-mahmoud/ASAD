@@ -114,8 +114,6 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
   }
 
   void _showManualAttendanceSheet() {
-    final records = _appState.activeSessionRecords;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -126,6 +124,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final records = _appState.activeSessionRecords;
             final query = _searchCtrl.text.trim().toLowerCase();
             final filtered = records.where((r) {
               if (query.isEmpty) return true;

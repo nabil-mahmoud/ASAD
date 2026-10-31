@@ -293,7 +293,7 @@ class AppState extends ChangeNotifier {
         type: ScanFeedbackType.duplicate,
         academicId: academicId,
         student: student,
-        message: 'مسجل مسبقاً بالجلسة',
+        message: 'الطالب مسجل بالفعل في هذه الجلسة',
       );
       _lastScanResult = result;
       notifyListeners();
@@ -316,7 +316,7 @@ class AppState extends ChangeNotifier {
       final result = ScanResult(
         type: ScanFeedbackType.wrongLocation,
         academicId: academicId,
-        message: 'طالب غير مقيد بكشوف الكلية',
+        message: 'طالب غير مقيد في هذا المكان / المقرر',
       );
       _lastScanResult = result;
       notifyListeners();
@@ -337,7 +337,7 @@ class AppState extends ChangeNotifier {
           academicId: academicId,
           student: student,
           actualLocation: student.location,
-          message: 'غير مسجل بهذا المكان (مكانه: ${student.location})',
+          message: 'طالب غير مقيد في هذا المكان / المقرر (مكانه: ${student.location})',
         );
         _lastScanResult = result;
         notifyListeners();
