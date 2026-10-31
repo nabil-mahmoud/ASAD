@@ -29,8 +29,12 @@ class Session {
     switch (sessionType) {
       case 'lecture':
         return 'محاضرة نظري عامة';
+      case 'theory':
+        return 'محاضرة نظري';
       case 'lab_practical':
         return 'درس عملي - تطبيقي';
+      case 'practical':
+        return 'درس عملي';
       case 'lab_theory':
         return 'سكشن نظري';
       default:

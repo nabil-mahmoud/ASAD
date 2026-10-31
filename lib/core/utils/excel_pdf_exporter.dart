@@ -14,13 +14,13 @@ import '../../domain/models/session.dart';
 import '../../domain/models/student.dart';
 
 class ExcelPdfExporter {
-  /// Generate and export Excel sheet (.xlsx) exactly matching ASAD specifications (Page 3)
-  static Future<File> exportSessionExcel({
+  /// Builds in-memory Excel object conforming strictly to official ASAD specifications
+  static Excel buildSessionExcel({
     required Session session,
     required Course? course,
     required String doctorName,
     required List<AttendanceRecord> records,
-  }) async {
+  }) {
     final excel = Excel.createExcel();
     final String sheetName = 'كشف الحضور والغياب';
     excel.rename(excel.getDefaultSheet() ?? 'Sheet1', sheetName);
@@ -35,6 +35,7 @@ class ExcelPdfExporter {
 
     final totalStudents = records.length;
     final presentCount = records.where((r) => r.score > 0).length;
+    final absentCount = totalStudents - presentCount;
     final percent = totalStudents > 0 ? ((presentCount / totalStudents) * 100).toStringAsFixed(1) : '0';
 
     // Cell Styles
@@ -85,13 +86,13 @@ class ExcelPdfExporter {
       horizontalAlign: HorizontalAlign.Center,
     );
 
-    // Row 1: University Banner
+    // Row 1: Header Block - Title (كشف حضور وغياب الطلاب)
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        TextCellValue('جامعة القاهرة - كلية الحاسبات والمعلومات | العام الجامعي: 2026/2027 (منظومة ASAD الذكية)');
+        TextCellValue('كشف حضور وغياب الطلاب - منظومة ASAD الذكية (جامعة القاهرة)');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-      CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 0),
+      CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0),
     );
 
     // Row 2: Course & Session Details
@@ -102,25 +103,33 @@ class ExcelPdfExporter {
     final loc = session.location ?? 'الكل';
 
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value =
-        TextCellValue('المقرر: $courseName | الفرقة: $gradeYear ($dept) | نوع الجلسة: $sessionType | المكان: $loc');
+        TextCellValue('المقرر: $courseName | الفرقة: $gradeYear | القسم العلمي: $dept | نوع الجلسة: $sessionType | المكان: $loc');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).cellStyle = metaStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-      CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 1),
+      CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 1),
     );
 
-    // Row 3: Date, Doctor, Attendance Count
+    // Row 3: Teacher, Date/Time & Attendance Statistics
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2)).value =
-        TextCellValue('التاريخ: $dateStr ($timeStr) | القائم بالتدريس: $doctorName | الحضور: $presentCount من $totalStudents (%$percent)');
+        TextCellValue('التاريخ والوقت: $dateStr ($timeStr) | القائم بالتدريس: $doctorName | إحصائية: إجمالي المقيدين ($totalStudents) - الحاضرين ($presentCount) - الغائبين ($absentCount) | نسبة الحضور: %$percent');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2)).cellStyle = metaStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2),
-      CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 2),
+      CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 2),
     );
 
-    // Empty separator row
-    // Row 4 (index 3): Table Headers
-    final headers = ['م', 'الكود الجامعي', 'اسم الطالب', 'المكان', 'الحالة', 'الدرجة', 'وقت الرصد'];
+    // Row 4 (index 3): Table Headers (Strictly 8 Columns)
+    final headers = [
+      'م',
+      'الكود الجامعي',
+      'اسم الطالب',
+      'المكان',
+      'الحالة (حاضر / غائب / عذر)',
+      'الدرجة / الرصد',
+      'وقت المسح',
+      'ملاحظات',
+    ];
     for (int col = 0; col < headers.length; col++) {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 3));
       cell.value = TextCellValue(headers[col]);
@@ -154,36 +163,33 @@ class ExcelPdfExporter {
         ..value = TextCellValue(rec.studentLocation ?? loc)
         ..cellStyle = style;
 
-      // Col 4: الحالة
+      // Col 4: الحالة (حاضر / غائب / عذر)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: currentRow))
         ..value = TextCellValue(rec.statusArabic)
         ..cellStyle = style;
 
-      // Col 5: الدرجة (1 or 0)
+      // Col 5: الدرجة / الرصد (Strictly 1 for present/excused, 0 for absent)
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: currentRow))
-        ..value = IntCellValue(rec.score)
+        ..value = IntCellValue(rec.score > 0 ? 1 : 0)
         ..cellStyle = style;
 
-      // Col 6: وقت الرصد
-      String scanTimeDisplay = '-- : --';
-      if (rec.scanTimestamp != null && rec.scanTimestamp!.isNotEmpty) {
-        try {
-          final dt = DateTime.parse(rec.scanTimestamp!);
-          scanTimeDisplay = intl.DateFormat('hh:mm a').format(dt);
-        } catch (_) {
-          scanTimeDisplay = rec.scanTimestamp!;
-        }
-      }
+      // Col 6: وقت المسح
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: currentRow))
-        ..value = TextCellValue(scanTimeDisplay)
+        ..value = TextCellValue(_formatScanTime(rec.scanTimestamp))
+        ..cellStyle = style;
+
+      // Col 7: ملاحظات
+      final note = rec.notes ?? (rec.score > 0 ? (rec.status == 'excused' ? 'عذر مقبول' : 'تم الرصد') : 'غائب');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: currentRow))
+        ..value = TextCellValue(note)
         ..cellStyle = style;
 
       currentRow++;
     }
 
     // Row N+1: SUM Formula Row (الصف الإجمالي بمعادلة SUM التلقائية)
-    final startExcelRow = 5; // 1-indexed in Excel (Row 5 is first student)
-    final endExcelRow = currentRow; // last student row
+    final startExcelRow = 5; // 1-indexed in Excel (Row 5 is first student data row)
+    final endExcelRow = currentRow > 4 ? currentRow : 5; // last student row
 
     final sumLabelCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow));
     sumLabelCell.value = TextCellValue('إجمالي درجات الحضور للجلسة (معادلة SUM التلقائية):');
@@ -197,23 +203,46 @@ class ExcelPdfExporter {
     sumFormulaCell.value = FormulaCellValue('SUM(F$startExcelRow:F$endExcelRow)');
     sumFormulaCell.cellStyle = sumRowStyle;
 
-    final sumValueCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: currentRow));
-    sumValueCell.value = TextCellValue('[$presentCount]');
-    sumValueCell.cellStyle = sumRowStyle;
+    final sumCountCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: currentRow));
+    sumCountCell.value = TextCellValue('[$presentCount]');
+    sumCountCell.cellStyle = sumRowStyle;
+
+    final sumPctCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: currentRow));
+    sumPctCell.value = TextCellValue('%$percent');
+    sumPctCell.cellStyle = sumRowStyle;
 
     // Set Column Widths for clean viewing
     sheet.setColumnWidth(0, 8);
-    sheet.setColumnWidth(1, 16);
+    sheet.setColumnWidth(1, 18);
     sheet.setColumnWidth(2, 30);
     sheet.setColumnWidth(3, 18);
-    sheet.setColumnWidth(4, 16);
-    sheet.setColumnWidth(5, 12);
-    sheet.setColumnWidth(6, 16);
+    sheet.setColumnWidth(4, 22);
+    sheet.setColumnWidth(5, 16);
+    sheet.setColumnWidth(6, 18);
+    sheet.setColumnWidth(7, 20);
 
-    // Save File
+    return excel;
+  }
+
+  /// Generate and export Excel sheet (.xlsx) exactly matching ASAD specifications
+  static Future<File> exportSessionExcel({
+    required Session session,
+    required Course? course,
+    required String doctorName,
+    required List<AttendanceRecord> records,
+  }) async {
+    final excel = buildSessionExcel(
+      session: session,
+      course: course,
+      doctorName: doctorName,
+      records: records,
+    );
+
+    final now = DateTime.now();
+    final dateStr = intl.DateFormat('yyyy-MM-dd').format(now);
     final cleanCourse = (course?.courseName ?? 'مقرر').replaceAll(' ', '_');
     final cleanLoc = (session.location ?? 'قاعة').replaceAll(' ', '_');
-    final fileName = 'غياب_${cleanCourse}_${cleanLoc}_$dateStr.xlsx';
+    final fileName = 'كشف_حضور_${cleanCourse}_${cleanLoc}_$dateStr.xlsx';
 
     final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/$fileName');
@@ -353,13 +382,14 @@ class ExcelPdfExporter {
             pw.Table(
               border: pw.TableBorder.all(color: PdfColor.fromHex('CBD5E1'), width: 0.5),
               columnWidths: {
-                0: const pw.FixedColumnWidth(24),  // م
-                1: const pw.FixedColumnWidth(60),  // الكود الجامعي
-                2: const pw.FlexColumnWidth(2.5),  // اسم الطالب
-                3: const pw.FlexColumnWidth(1.4),  // المكان
-                4: const pw.FixedColumnWidth(60),  // الحالة
-                5: const pw.FixedColumnWidth(35),  // الدرجة
-                6: const pw.FixedColumnWidth(50),  // وقت الرصد
+                0: const pw.FixedColumnWidth(20),  // م
+                1: const pw.FixedColumnWidth(55),  // الكود الجامعي
+                2: const pw.FlexColumnWidth(2.3),  // اسم الطالب
+                3: const pw.FlexColumnWidth(1.2),  // المكان
+                4: const pw.FixedColumnWidth(52),  // الحالة
+                5: const pw.FixedColumnWidth(30),  // الدرجة
+                6: const pw.FixedColumnWidth(48),  // وقت المسح
+                7: const pw.FlexColumnWidth(1.1),  // ملاحظات
               },
               children: [
                 // Header
@@ -372,7 +402,8 @@ class ExcelPdfExporter {
                     _pdfCell('المكان', fontBold, isHeader: true),
                     _pdfCell('الحالة', fontBold, isHeader: true),
                     _pdfCell('الدرجة', fontBold, isHeader: true),
-                    _pdfCell('وقت الرصد', fontBold, isHeader: true),
+                    _pdfCell('وقت المسح', fontBold, isHeader: true),
+                    _pdfCell('ملاحظات', fontBold, isHeader: true),
                   ],
                 ),
                 // Data Rows
@@ -393,9 +424,13 @@ class ExcelPdfExporter {
                         fontBold,
                         color: records[i].score > 0 ? PdfColor.fromHex('059669') : PdfColor.fromHex('DC2626'),
                       ),
-                      _pdfCell('${records[i].score}', fontBold),
+                      _pdfCell('${records[i].score > 0 ? 1 : 0}', fontBold),
                       _pdfCell(
                         _formatScanTime(records[i].scanTimestamp),
+                        font,
+                      ),
+                      _pdfCell(
+                        records[i].notes ?? (records[i].score > 0 ? (records[i].status == 'excused' ? 'عذر' : 'تم الرصد') : 'غائب'),
                         font,
                       ),
                     ],
@@ -412,6 +447,7 @@ class ExcelPdfExporter {
                     _pdfCell('$presentCount / $totalStudents', fontBold),
                     _pdfCell('[$presentCount]', fontBold, color: PdfColor.fromHex('064E3B')),
                     _pdfCell('%$percent', fontBold),
+                    _pdfCell('نسبة الحضور', fontBold),
                   ],
                 ),
               ],
@@ -423,7 +459,7 @@ class ExcelPdfExporter {
 
     final cleanCourse = (course?.courseName ?? 'مقرر').replaceAll(' ', '_');
     final cleanLoc = (session.location ?? 'قاعة').replaceAll(' ', '_');
-    final fileName = 'تقرير_غياب_${cleanCourse}_${cleanLoc}_$dateStr.pdf';
+    final fileName = 'كشف_حضور_${cleanCourse}_${cleanLoc}_$dateStr.pdf';
 
     final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/$fileName');

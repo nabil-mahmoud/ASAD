@@ -371,6 +371,21 @@ class DatabaseHelper {
     });
   }
 
+  /// Finalize and archive session attendance:
+  /// Ensures all enrolled students not marked present or excused are saved as 'absent' with score = 0.
+  Future<void> finalizeSessionAttendance(int sessionId) async {
+    final db = await database;
+    await db.update(
+      'Attendance_Records',
+      {
+        'status': 'absent',
+        'score': 0,
+      },
+      where: 'session_id = ? AND (status IS NULL OR status = "" OR (status != "present" AND status != "excused"))',
+      whereArgs: [sessionId],
+    );
+  }
+
   Future<void> recordAttendance({
     required int sessionId,
     required String academicId,

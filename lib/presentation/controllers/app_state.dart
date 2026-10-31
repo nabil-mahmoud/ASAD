@@ -425,6 +425,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Finalize and archive the active session
+  Future<void> finalizeAndSaveSession() async {
+    if (_activeSession?.sessionId != null) {
+      final sessionId = _activeSession!.sessionId!;
+      await _db.finalizeSessionAttendance(sessionId);
+      await loadActiveSessionRecords();
+      await refreshAll();
+    }
+  }
+
   Future<void> endActiveSession() async {
     _activeSession = null;
     _activeCourse = null;

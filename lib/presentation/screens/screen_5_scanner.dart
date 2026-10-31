@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/excel_pdf_exporter.dart';
+import '../../domain/models/attendance_record.dart';
 import '../controllers/app_state.dart';
 import '../widgets/scan_feedback_overlay.dart';
 import 'screen_6_archive.dart';
@@ -290,9 +292,18 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: AppColors.surfaceDark,
-        title: const Text('إنهاء جلسة الحضور'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.archive_outlined, color: AppColors.mintAccent),
+            SizedBox(width: 8),
+            Text('إنهاء وحفظ الجلسة'),
+          ],
+        ),
         content: Text(
-          'تم رصد ${_appState.activePresentCount} من إجمالي ${_appState.activeTotalTargetCount} طالباً.\nهل تريد حفظ الجلسة والانتقال للأرشيف لتصدير كشف الإكسيل والـ PDF؟',
+          'تم رصد ${_appState.activePresentCount} من إجمالي ${_appState.activeTotalTargetCount} طالباً.\n\n'
+          'عند التأكيد، سيتم رصد كافة الطلاب غير الحاضرين كـ "غائب" (درجة 0)، وإيقاف الكاميرا، وحفظ الجلسة في الأرشيف الدائم.',
+          style: const TextStyle(fontSize: 14, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -300,15 +311,319 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             child: const Text('متابعة المسح'),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emerald,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () async {
               Navigator.pop(c);
-              await _appState.refreshAll();
-              if (!mounted) return;
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const Screen6Archive()),
-              );
+              await _finalizeSession();
             },
-            child: const Text('إنهاء وحفظ الجلسة'),
+            child: const Text('تأكيد الإنهاء والحفظ'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _finalizeSession() async {
+    // 1. Safely stop/pause camera
+    try {
+      await _scannerController?.stop();
+    } catch (_) {}
+
+    // 2. Finalize and persist in database (all non-present students saved as absent with score = 0)
+    await _appState.finalizeAndSaveSession();
+
+    if (!mounted) return;
+
+    // 3. Open Session Finalization & Direct Export Modal
+    _showSessionExportSheet();
+  }
+
+  void _showSessionExportSheet() {
+    final session = _appState.activeSession;
+    final course = _appState.activeCourse;
+    final records = List<AttendanceRecord>.from(_appState.activeSessionRecords);
+    final presentCount = records.where((r) => r.score > 0).length;
+    final absentCount = records.length - presentCount;
+    final percentage = records.isNotEmpty ? ((presentCount / records.length) * 100).toStringAsFixed(1) : '0';
+
+    bool isExporting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Success Header
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.emerald.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.emerald, width: 2),
+                    ),
+                    child: const Icon(Icons.check_circle_rounded, color: AppColors.emerald, size: 36),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'تم إنهاء وحفظ الجلسة في الأرشيف بنجاح',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${course?.courseName ?? "المقرر"} • ${session?.sessionTypeArabic ?? ""}',
+                    style: const TextStyle(fontSize: 13, color: AppColors.mintAccent),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Stats Overview Cards
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryMetric(
+                          label: 'إجمالي المقيدين',
+                          value: '${records.length}',
+                          color: AppColors.textLight,
+                          bgColor: AppColors.surfaceCard,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryMetric(
+                          label: 'الحاضرين',
+                          value: '$presentCount',
+                          color: AppColors.emerald,
+                          bgColor: AppColors.emerald.withOpacity(0.12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryMetric(
+                          label: 'الغائبين',
+                          value: '$absentCount',
+                          color: AppColors.dangerRed,
+                          bgColor: AppColors.dangerRed.withOpacity(0.12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildSummaryMetric(
+                          label: 'نسبة الحضور',
+                          value: '%$percentage',
+                          color: AppColors.mintAccent,
+                          bgColor: AppColors.royalDark,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  if (isExporting) ...[
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(color: AppColors.emerald),
+                          SizedBox(height: 12),
+                          Text('جاري إعداد الملف والمشاركة...', style: TextStyle(color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // Export Excel Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF107C41), // Official Excel Green
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.table_view_rounded, size: 22),
+                        label: const Text(
+                          'تصدير كشف إكسيل (.xlsx) بمعادلة SUM',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: session == null
+                            ? null
+                            : () async {
+                                setSheetState(() => isExporting = true);
+                                try {
+                                  final doctorName = _appState.doctorProfile?.doctorName ?? 'القائم بالتدريس';
+                                  final file = await ExcelPdfExporter.exportSessionExcel(
+                                    session: session,
+                                    course: course,
+                                    doctorName: doctorName,
+                                    records: records,
+                                  );
+                                  await ExcelPdfExporter.shareFile(
+                                    file,
+                                    'كشف حضور - ${course?.courseName ?? "الجلسة"}',
+                                  );
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('خطأ أثناء تصدير الإكسيل: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (context.mounted) setSheetState(() => isExporting = false);
+                                }
+                              },
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Export PDF Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.mintAccent,
+                          side: const BorderSide(color: AppColors.emerald, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 22),
+                        label: const Text(
+                          'تصدير تقرير PDF معتمد للطباعة والمشاركة',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: session == null
+                            ? null
+                            : () async {
+                                setSheetState(() => isExporting = true);
+                                try {
+                                  final doctorName = _appState.doctorProfile?.doctorName ?? 'القائم بالتدريس';
+                                  final file = await ExcelPdfExporter.exportSessionPdf(
+                                    session: session,
+                                    course: course,
+                                    doctorName: doctorName,
+                                    records: records,
+                                  );
+                                  await ExcelPdfExporter.shareFile(
+                                    file,
+                                    'تقرير غياب - ${course?.courseName ?? "الجلسة"}',
+                                  );
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('خطأ أثناء تصدير الـ PDF: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (context.mounted) setSheetState(() => isExporting = false);
+                                }
+                              },
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Navigation Actions
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.textMuted,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: const Icon(Icons.home_rounded, size: 18),
+                            label: const Text('الرئيسية'),
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              await _appState.endActiveSession();
+                              if (context.mounted) {
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surfaceCard,
+                              foregroundColor: AppColors.mintAccent,
+                              side: const BorderSide(color: AppColors.surfaceCardBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                            icon: const Icon(Icons.archive_outlined, size: 18),
+                            label: const Text('سجل الأرشيف'),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (_) => const Screen6Archive()),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSummaryMetric({
+    required String label,
+    required String value,
+    required Color color,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textMuted,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
