@@ -24,6 +24,11 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
   // Manual Attendance Search & Selection
   final TextEditingController _searchCtrl = TextEditingController();
 
+  // Scan Throttling & Debounce (1.8s cooling-down per barcode to avoid camera stream duplicate flood)
+  DateTime? _lastScannedTimestamp;
+  String? _lastScannedBarcode;
+  static const Duration _cooldownDuration = Duration(milliseconds: 1800);
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +39,15 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
   void _initScanner() {
     try {
       _scannerController = MobileScannerController(
+        formats: const [
+          BarcodeFormat.all,
+          BarcodeFormat.qrCode,
+          BarcodeFormat.code128,
+          BarcodeFormat.code39,
+          BarcodeFormat.ean13,
+        ],
         detectionSpeed: DetectionSpeed.noDuplicates,
+        detectionTimeoutMs: 1500,
         facing: CameraFacing.back,
         torchEnabled: false,
       );
@@ -57,18 +70,37 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
   }
 
   Future<void> _handleBarcodeDetected(String rawCode) async {
+    final cleanCode = rawCode.trim();
+    if (cleanCode.isEmpty) return;
+
+    final now = DateTime.now();
+
+    // 1. Debounce & Throttling: Ignore rapid duplicate reads of the same barcode within 1.8 seconds
+    if (_lastScannedBarcode == cleanCode &&
+        _lastScannedTimestamp != null &&
+        now.difference(_lastScannedTimestamp!) < _cooldownDuration) {
+      return;
+    }
+
     if (_isProcessing) return;
     _isProcessing = true;
+    _lastScannedTimestamp = now;
+    _lastScannedBarcode = cleanCode;
 
-    await _appState.processScan(rawCode);
+    try {
+      await _appState.processScan(cleanCode);
 
-    // Auto-dismiss the feedback banner/border after 2 seconds
-    _overlayDismissTimer?.cancel();
-    _overlayDismissTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) setState(() {});
-    });
-
-    _isProcessing = false;
+      // Auto-dismiss the feedback banner/border after 2 seconds
+      _overlayDismissTimer?.cancel();
+      _overlayDismissTimer = Timer(const Duration(milliseconds: 2000), () {
+        if (mounted) setState(() {});
+      });
+    } finally {
+      // Small debounce delay before releasing processing lock
+      Future.delayed(const Duration(milliseconds: 250), () {
+        _isProcessing = false;
+      });
+    }
   }
 
   Future<void> _toggleTorch() async {
@@ -357,7 +389,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
                       // Center guideline hint
                       Center(
                         child: Text(
-                          'وجّه الكاميرا نحو كود الكارنيه',
+                          'وجّه الكاميرا نحو باركود أو QR الكارنيه',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.7),
                             fontSize: 12,
@@ -502,8 +534,8 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
           final barcodes = capture.barcodes;
           for (final barcode in barcodes) {
             final rawValue = barcode.rawValue;
-            if (rawValue != null && rawValue.isNotEmpty) {
-              _handleBarcodeDetected(rawValue);
+            if (rawValue != null && rawValue.trim().isNotEmpty) {
+              _handleBarcodeDetected(rawValue.trim());
               break;
             }
           }

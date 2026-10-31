@@ -78,6 +78,9 @@ class AppState extends ChangeNotifier {
   final Set<String> _presentInSession = <String>{};
   Set<String> get presentInSession => _presentInSession;
 
+  // Fast in-memory cache of student profiles for zero-latency retrieval
+  final Map<String, Student> _sessionStudentsCache = <String, Student>{};
+
   int get activePresentCount => _presentInSession.length;
   int get activeTotalTargetCount => _activeSessionRecords.length;
 
@@ -212,7 +215,12 @@ class AppState extends ChangeNotifier {
     _activeSession = launchedSession;
     _activeCourse = course;
     _presentInSession.clear();
+    _sessionStudentsCache.clear();
+    for (final s in targetStudents) {
+      _sessionStudentsCache[s.academicId.trim()] = s;
+    }
     _lastScanResult = null;
+    _lastScanTime = null;
 
     await loadActiveSessionRecords();
     return launchedSession;
@@ -233,7 +241,10 @@ class AppState extends ChangeNotifier {
 
     final presents = await _db.getPresentAcademicIdsInSession(session.sessionId!);
     _presentInSession.clear();
-    _presentInSession.addAll(presents);
+    _presentInSession.addAll(presents.map((e) => e.trim()));
+    _sessionStudentsCache.clear();
+    _lastScanTime = null;
+    _lastScanResult = null;
 
     await loadActiveSessionRecords();
   }
@@ -241,6 +252,12 @@ class AppState extends ChangeNotifier {
   Future<void> loadActiveSessionRecords() async {
     if (_activeSession == null) return;
     _activeSessionRecords = await _db.getSessionRecords(_activeSession!.sessionId!);
+    // Synchronize in-memory set with present students (score > 0)
+    for (final rec in _activeSessionRecords) {
+      if (rec.score > 0) {
+        _presentInSession.add(rec.academicId.trim());
+      }
+    }
     notifyListeners();
   }
 
@@ -255,18 +272,23 @@ class AppState extends ChangeNotifier {
       );
     }
 
-    // Debounce duplicate scans within 1.2s to prevent sensor flicker
+    // Debounce duplicate scans within 1.8s for the same barcode to prevent sensor flicker
     final now = DateTime.now();
     if (_lastScanTime != null &&
-        now.difference(_lastScanTime!).inMilliseconds < 800 &&
-        _lastScanResult?.academicId == academicId) {
+        _lastScanResult?.academicId == academicId &&
+        now.difference(_lastScanTime!).inMilliseconds < 1800) {
       return _lastScanResult!;
     }
     _lastScanTime = now;
 
-    // 1. O(1) Memory Check: Is student already present in this session?
+    // 1. Instant O(1) Memory Check: Is student already present in this active session?
     if (_presentInSession.contains(academicId)) {
-      final student = await _db.getStudentById(academicId);
+      Student? student = _sessionStudentsCache[academicId];
+      student ??= await _db.getStudentById(academicId);
+      if (student != null) {
+        _sessionStudentsCache[academicId] = student;
+      }
+
       final result = ScanResult(
         type: ScanFeedbackType.duplicate,
         academicId: academicId,
@@ -282,8 +304,12 @@ class AppState extends ChangeNotifier {
       return result;
     }
 
-    // Query student from local SQLite
-    final student = await _db.getStudentById(academicId);
+    // 2. Query student from in-memory cache or immediate local SQLite Students table
+    Student? student = _sessionStudentsCache[academicId];
+    student ??= await _db.getStudentById(academicId);
+    if (student != null) {
+      _sessionStudentsCache[academicId] = student;
+    }
 
     // If student not found in roster
     if (student == null) {
@@ -300,7 +326,7 @@ class AppState extends ChangeNotifier {
       return result;
     }
 
-    // 2. Location Check (التحقق من مطابقة الطالب للمكان المخصص)
+    // 3. Location Check (التحقق من مطابقة الطالب للمكان المخصص)
     final sessionLoc = _activeSession!.location?.trim();
     final bool isPractical = _activeSession!.isLabPractical || _activeSession!.isLabTheory;
 
@@ -323,7 +349,7 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    // 3. Valid Scan (مسح ناجح ومقيد)
+    // 4. Valid Scan (مسح ناجح ومقيد)
     _presentInSession.add(academicId);
     await _db.recordAttendance(
       sessionId: _activeSession!.sessionId!,
@@ -403,8 +429,10 @@ class AppState extends ChangeNotifier {
     _activeSession = null;
     _activeCourse = null;
     _presentInSession.clear();
+    _sessionStudentsCache.clear();
     _activeSessionRecords.clear();
     _lastScanResult = null;
+    _lastScanTime = null;
     await refreshAll();
   }
 
