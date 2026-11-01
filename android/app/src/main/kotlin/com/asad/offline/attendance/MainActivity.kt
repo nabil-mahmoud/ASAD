@@ -1,4 +1,4 @@
-package com.asad.attendance.asad_app
+package com.asad.offline.attendance
 
 import io.flutter.embedding.android.FlutterActivity
 
