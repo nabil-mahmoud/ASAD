@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         applicationId = "com.asad.offline.attendance"
-        minSdk = 21
+        minSdk = flutter.minSdkVersion
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
@@ -35,7 +35,9 @@ android {
         create("release") {
             keyAlias = keystoreProperties.getProperty("keyAlias")
             keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+            storeFile = keystoreProperties.getProperty("storeFile")?.let {
+                rootProject.file(it).takeIf { f -> f.exists() } ?: file(it)
+            }
             storePassword = keystoreProperties.getProperty("storePassword")
         }
     }
