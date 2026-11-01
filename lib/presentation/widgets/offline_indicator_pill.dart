@@ -13,8 +13,8 @@ class OfflineIndicatorPill extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 12,
-        vertical: compact ? 4 : 6,
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 3 : 5,
       ),
       decoration: BoxDecoration(
         color: AppColors.surfaceCard,
@@ -32,21 +32,25 @@ class OfflineIndicatorPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: 7,
+            height: 7,
             decoration: const BoxDecoration(
               color: AppColors.mintAccent,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 6),
-          Text(
-            compact ? 'OFFLINE' : 'OFFLINE | يعمل بدون إنترنت 100%',
-            style: TextStyle(
-              fontSize: compact ? 11 : 12,
-              fontWeight: FontWeight.bold,
-              color: AppColors.mintAccent,
-              letterSpacing: 0.5,
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              compact ? 'OFFLINE' : 'أوفلاين | محلي 100%',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: compact ? 10.5 : 11,
+                fontWeight: FontWeight.bold,
+                color: AppColors.mintAccent,
+                letterSpacing: 0.3,
+              ),
             ),
           ),
         ],

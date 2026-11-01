@@ -427,7 +427,7 @@ class DatabaseHelper {
         st.grade_year,
         st.department
       FROM Attendance_Records ar
-      LEFT JOIN Students st ON ar.academic_id = st.academicId
+      LEFT JOIN Students st ON ar.academic_id = st.academic_id
       WHERE ar.session_id = ?
       ORDER BY 
         CASE ar.status 
