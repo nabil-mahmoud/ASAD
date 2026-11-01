@@ -26,9 +26,9 @@ android {
     defaultConfig {
         applicationId = "com.asad.offline.attendance"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     signingConfigs {
