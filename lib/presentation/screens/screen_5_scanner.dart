@@ -52,9 +52,28 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
         detectionTimeoutMs: 1500,
         facing: CameraFacing.back,
         torchEnabled: false,
+        autoStart: true,
       );
     } catch (e) {
       debugPrint('MobileScanner init error (desktop/web): $e');
+    }
+  }
+
+  Future<void> _startScanner() async {
+    if (!mounted) return;
+    if (_scannerController == null) {
+      _initScanner();
+      if (mounted) setState(() {});
+      return;
+    }
+    try {
+      final ctrl = _scannerController!;
+      if (!ctrl.value.isRunning && !ctrl.value.isStarting) {
+        await ctrl.start();
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Start camera error: $e');
     }
   }
 
@@ -718,8 +737,11 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             ),
           ),
 
-          // 3. Audio/Visual/Haptic Instant Response Overlay
-          ScanFeedbackOverlay(result: _appState.lastScanResult),
+          // 3. Audio/Visual/Haptic Instant Response Overlay (positioned below Counter Bar)
+          ScanFeedbackOverlay(
+            result: _appState.lastScanResult,
+            topOffset: 92.0,
+          ),
 
           // 4. Live Counter Bar (شريط العداد اللحظي)
           Positioned(
@@ -794,6 +816,51 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
           ),
 
 
+          // 5. Floating "افتح الكاميرا" Button (يظهر إذا لم تكن الكاميرا تعمل)
+          if (_scannerController != null)
+            ValueListenableBuilder<MobileScannerState>(
+              valueListenable: _scannerController!,
+              builder: (context, state, _) {
+                if (state.isRunning) return const SizedBox.shrink();
+                return Positioned(
+                  bottom: 85,
+                  left: 24,
+                  right: 24,
+                  child: Center(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.emerald.withOpacity(0.55),
+                            blurRadius: 18,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.emerald,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          elevation: 6,
+                        ),
+                        onPressed: _startScanner,
+                        icon: const Icon(Icons.camera_alt_rounded, size: 24),
+                        label: const Text(
+                          'افتح الكاميرا',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
           // 6. Bottom Finish & Save Bar
           Positioned(
             bottom: 16,
@@ -855,7 +922,13 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
           }
         },
         errorBuilder: (context, error) {
-          return _cameraFallbackView('الكاميرا غير مفعلة أو قيد الاستخدام في تطبيق آخر');
+          final isUnsupported = error.errorCode == MobileScannerErrorCode.unsupported ||
+              error.toString().toLowerCase().contains('unsupported') ||
+              error.toString().toLowerCase().contains('camera');
+          final msg = isUnsupported
+              ? 'الكاميرا غير متوفرة على هذا الجهاز (محاكي Simulator)'
+              : 'الكاميرا غير مفعلة أو تحتاج لمنح الإذن';
+          return _cameraFallbackView(msg);
         },
       );
     }
@@ -876,7 +949,19 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
               style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.emerald,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _startScanner,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('تشغيل الكاميرا الآن'),
+            ),
+            const SizedBox(height: 12),
             const Text(
               'يمكنك استخدام نافذة التحضير اليدوي والأعذار بالأعلى للبحث والرصد',
               style: TextStyle(color: AppColors.mintAccent, fontSize: 12),

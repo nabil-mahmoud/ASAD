@@ -7,6 +7,7 @@ import '../../domain/models/course.dart';
 import '../../domain/models/doctor_profile.dart';
 import '../../domain/models/session.dart';
 import '../../domain/models/student.dart';
+import '../../domain/models/cumulative_student_report.dart';
 
 enum ScanFeedbackType {
   success,        // 1. مسح ناجح ومقيد (أخضر + 880Hz + نبضة خفيفة + درجة 1)
@@ -449,5 +450,48 @@ class AppState extends ChangeNotifier {
   Future<void> deleteSession(int sessionId) async {
     await _db.deleteSession(sessionId);
     await refreshAll();
+  }
+
+  Future<List<CumulativeStudentReport>> getCumulativeCourseReport(int courseId) async {
+    return await _db.getCumulativeCourseReport(courseId);
+  }
+
+  Future<List<Session>> getCourseSessions(int courseId) async {
+    return await _db.getCourseSessions(courseId);
+  }
+
+  Future<void> updateAttendanceRecordStatus({
+    required int recordId,
+    required String status,
+    required int score,
+    String? notes,
+  }) async {
+    await _db.updateAttendanceRecordStatus(
+      recordId: recordId,
+      status: status,
+      score: score,
+      notes: notes,
+    );
+    notifyListeners();
+  }
+
+  /// Full Factory Reset: Clears SQLite database and in-memory state
+  Future<void> factoryReset() async {
+    await _db.factoryReset();
+    _doctorProfile = null;
+    _courses = [];
+    _uniqueGradeYears = [];
+    _uniqueDepartments = [];
+    _uniqueLocations = [];
+    _totalStudents = 0;
+    _sessions = [];
+    _activeSession = null;
+    _activeCourse = null;
+    _presentInSession.clear();
+    _sessionStudentsCache.clear();
+    _activeSessionRecords.clear();
+    _lastScanResult = null;
+    _lastScanTime = null;
+    notifyListeners();
   }
 }

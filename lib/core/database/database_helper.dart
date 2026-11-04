@@ -10,6 +10,7 @@ import '../../domain/models/course.dart';
 import '../../domain/models/student.dart';
 import '../../domain/models/session.dart';
 import '../../domain/models/attendance_record.dart';
+import '../../domain/models/cumulative_student_report.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -146,6 +147,20 @@ class DatabaseHelper {
     final db = await database;
     final res = await db.query('Courses', orderBy: 'course_id DESC');
     return res.map((m) => Course.fromMap(m)).toList();
+  }
+
+  Future<Course?> getCourseById(int courseId) async {
+    final db = await database;
+    final res = await db.query(
+      'Courses',
+      where: 'course_id = ?',
+      whereArgs: [courseId],
+      limit: 1,
+    );
+    if (res.isNotEmpty) {
+      return Course.fromMap(res.first);
+    }
+    return null;
   }
 
   Future<int> insertCourse(Course course) async {
@@ -464,5 +479,126 @@ class DatabaseHelper {
       'students': Sqflite.firstIntValue(studentsCountRes) ?? 0,
       'sessions': Sqflite.firstIntValue(sessionsCountRes) ?? 0,
     };
+  }
+
+  // ---------------- Cumulative Reports & History Management ----------------
+  Future<List<Session>> getCourseSessions(int courseId) async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT 
+        s.session_id,
+        s.course_id,
+        s.session_type,
+        s.location,
+        s.created_at,
+        c.course_name,
+        (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id) as total_students,
+        (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id AND (ar.status = 'present' OR ar.status = 'excused')) as present_count
+      FROM Sessions s
+      LEFT JOIN Courses c ON s.course_id = c.course_id
+      WHERE s.course_id = ?
+      ORDER BY s.created_at ASC
+    ''', [courseId]);
+    return res.map((m) => Session.fromMap(m)).toList();
+  }
+
+  Future<void> updateAttendanceRecordStatus({
+    required int recordId,
+    required String status,
+    required int score,
+    String? notes,
+  }) async {
+    final db = await database;
+    await db.update(
+      'Attendance_Records',
+      {
+        'status': status,
+        'score': score,
+        'notes': ?notes,
+      },
+      where: 'record_id = ?',
+      whereArgs: [recordId],
+    );
+  }
+
+  Future<List<CumulativeStudentReport>> getCumulativeCourseReport(int courseId) async {
+    final db = await database;
+    final course = await getCourseById(courseId);
+    if (course == null) return [];
+
+    final sessions = await getCourseSessions(courseId);
+    final totalSessions = sessions.length;
+    final sessionIds = sessions.map((s) => s.sessionId!).toList();
+
+    List<Student> students = [];
+    if (course.gradeYear.isNotEmpty && course.department.isNotEmpty) {
+      students = await getStudents(
+        gradeYear: course.gradeYear,
+        department: course.department,
+      );
+    }
+
+    if (sessionIds.isNotEmpty) {
+      final placeholders = List.filled(sessionIds.length, '?').join(',');
+      final extraStudentsRes = await db.rawQuery('''
+        SELECT DISTINCT st.* FROM Students st
+        INNER JOIN Attendance_Records ar ON st.academic_id = ar.academic_id
+        WHERE ar.session_id IN ($placeholders)
+      ''', sessionIds);
+      final extraStudents = extraStudentsRes.map((m) => Student.fromMap(m)).toList();
+      final existingIds = students.map((s) => s.academicId).toSet();
+      for (final es in extraStudents) {
+        if (!existingIds.contains(es.academicId)) {
+          students.add(es);
+        }
+      }
+    }
+
+    if (students.isEmpty) return [];
+
+    final Map<String, List<Map<String, dynamic>>> recordsByStudent = {};
+    if (sessionIds.isNotEmpty) {
+      final placeholders = List.filled(sessionIds.length, '?').join(',');
+      final recordsRes = await db.rawQuery('''
+        SELECT ar.record_id, ar.session_id, ar.academic_id, ar.status, ar.score, ar.notes
+        FROM Attendance_Records ar
+        WHERE ar.session_id IN ($placeholders)
+      ''', sessionIds);
+
+      for (final r in recordsRes) {
+        final academicId = r['academic_id'] as String;
+        recordsByStudent.putIfAbsent(academicId, () => []).add(r);
+      }
+    }
+
+    final List<CumulativeStudentReport> reports = [];
+    for (final st in students) {
+      final stRecords = recordsByStudent[st.academicId] ?? [];
+      reports.add(
+        CumulativeStudentReport.fromAggregation(
+          student: st,
+          totalCourseSessions: totalSessions,
+          records: stRecords,
+        ),
+      );
+    }
+
+    reports.sort((a, b) => a.academicId.compareTo(b.academicId));
+    return reports;
+  }
+
+  /// Full Factory Reset: Clears all tables in database
+  Future<void> factoryReset() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('Attendance_Records');
+      await txn.delete('Sessions');
+      await txn.delete('Students');
+      await txn.delete('Courses');
+      await txn.delete('Doctor_Profile');
+    });
+    try {
+      await db.rawQuery('VACUUM');
+    } catch (_) {}
   }
 }

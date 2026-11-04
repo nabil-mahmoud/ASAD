@@ -12,6 +12,7 @@ import '../../domain/models/attendance_record.dart';
 import '../../domain/models/course.dart';
 import '../../domain/models/session.dart';
 import '../../domain/models/student.dart';
+import '../../domain/models/cumulative_student_report.dart';
 
 class ExcelPdfExporter {
   /// Builds in-memory Excel object conforming strictly to official ASAD specifications
@@ -460,6 +461,417 @@ class ExcelPdfExporter {
     final cleanCourse = (course?.courseName ?? 'مقرر').replaceAll(' ', '_');
     final cleanLoc = (session.location ?? 'قاعة').replaceAll(' ', '_');
     final fileName = 'كشف_حضور_${cleanCourse}_${cleanLoc}_$dateStr.pdf';
+
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+    await file.writeAsBytes(await pdf.save(), flush: true);
+    return file;
+  }
+
+  /// Builds in-memory cumulative attendance ledger Excel
+  static Excel buildCumulativeExcel({
+    required Course course,
+    required String doctorName,
+    required List<Session> sessions,
+    required List<CumulativeStudentReport> reports,
+  }) {
+    final excel = Excel.createExcel();
+    final String sheetName = 'سجل الرصد التراكمي';
+    excel.rename(excel.getDefaultSheet() ?? 'Sheet1', sheetName);
+    final Sheet sheet = excel[sheetName];
+    sheet.isRTL = true;
+
+    final now = DateTime.now();
+    final dateStr = intl.DateFormat('yyyy-MM-dd').format(now);
+    final totalStudents = reports.length;
+    final totalSessions = sessions.length;
+    final double avgPct = reports.isNotEmpty
+        ? reports.map((r) => r.attendancePercentage).reduce((a, b) => a + b) / reports.length
+        : 0.0;
+
+    final CellStyle titleStyle = CellStyle(
+      bold: true,
+      fontSize: 14,
+      backgroundColorHex: ExcelColor.fromHexString('#064E3B'),
+      fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+    );
+    final CellStyle metaStyle = CellStyle(
+      bold: true,
+      fontSize: 11,
+      backgroundColorHex: ExcelColor.fromHexString('#E6F4EA'),
+      fontColorHex: ExcelColor.fromHexString('#064E3B'),
+      horizontalAlign: HorizontalAlign.Right,
+    );
+    final CellStyle headerStyle = CellStyle(
+      bold: true,
+      fontSize: 11,
+      backgroundColorHex: ExcelColor.fromHexString('#059669'),
+      fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+      horizontalAlign: HorizontalAlign.Center,
+      verticalAlign: VerticalAlign.Center,
+    );
+    final CellStyle regularStyle = CellStyle(
+      fontSize: 10,
+      backgroundColorHex: ExcelColor.fromHexString('#F0FDF4'),
+      horizontalAlign: HorizontalAlign.Center,
+    );
+    final CellStyle atRiskStyle = CellStyle(
+      fontSize: 10,
+      backgroundColorHex: ExcelColor.fromHexString('#FEF3C7'),
+      fontColorHex: ExcelColor.fromHexString('#92400E'),
+      horizontalAlign: HorizontalAlign.Center,
+    );
+    final CellStyle deprivedStyle = CellStyle(
+      fontSize: 10,
+      backgroundColorHex: ExcelColor.fromHexString('#FEF2F2'),
+      fontColorHex: ExcelColor.fromHexString('#991B1B'),
+      horizontalAlign: HorizontalAlign.Center,
+    );
+    final CellStyle sumRowStyle = CellStyle(
+      bold: true,
+      fontSize: 11,
+      backgroundColorHex: ExcelColor.fromHexString('#D1FAE5'),
+      fontColorHex: ExcelColor.fromHexString('#064E3B'),
+      horizontalAlign: HorizontalAlign.Center,
+    );
+
+    final maxCol = 9 + sessions.length;
+
+    // Row 1: Title
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
+        TextCellValue('سجل رصد الحضور التراكمي الشامل - منظومة ASAD الذكية');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
+    sheet.merge(
+      CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+      CellIndex.indexByColumnRow(columnIndex: maxCol, rowIndex: 0),
+    );
+
+    // Row 2: Course info
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value =
+        TextCellValue('المقرر: ${course.courseName} | الفرقة: ${course.gradeYear} | القسم: ${course.department} | نوع التدريس: ${course.teachingTypeArabic} | إجمالي الجلسات: $totalSessions');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).cellStyle = metaStyle;
+    sheet.merge(
+      CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
+      CellIndex.indexByColumnRow(columnIndex: maxCol, rowIndex: 1),
+    );
+
+    // Row 3: Doctor & Stats
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2)).value =
+        TextCellValue('القائم بالتدريس: $doctorName | التاريخ: $dateStr | إجمالي الطلاب المقيدين: $totalStudents | متوسط الحضور العام: %${avgPct.toStringAsFixed(1)}');
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2)).cellStyle = metaStyle;
+    sheet.merge(
+      CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2),
+      CellIndex.indexByColumnRow(columnIndex: maxCol, rowIndex: 2),
+    );
+
+    // Row 4: Column Headers
+    final baseHeaders = [
+      'م',
+      'الكود الجامعي',
+      'اسم الطالب',
+      'المكان / المجموعة',
+      'مرات الحضور',
+      'مرات الغياب',
+      'الأعذار',
+      'مجموع الدرجات',
+      'نسبة الحضور %',
+      'حالة الانتظام',
+    ];
+
+    int colIdx = 0;
+    for (final h in baseHeaders) {
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIdx++, rowIndex: 3));
+      cell.value = TextCellValue(h);
+      cell.cellStyle = headerStyle;
+    }
+
+    for (int s = 0; s < sessions.length; s++) {
+      final sess = sessions[s];
+      final sessionHeader = 'ج ${s + 1} (${sess.sessionTypeArabic.split(" ").first})';
+      final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: colIdx++, rowIndex: 3));
+      cell.value = TextCellValue(sessionHeader);
+      cell.cellStyle = headerStyle;
+    }
+
+    // Student Rows
+    int currentRow = 4;
+    for (int i = 0; i < reports.length; i++) {
+      final rep = reports[i];
+      CellStyle rowStyle = regularStyle;
+      if (rep.isDeprived) {
+        rowStyle = deprivedStyle;
+      } else if (rep.isAtRisk) {
+        rowStyle = atRiskStyle;
+      }
+
+      int c = 0;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = IntCellValue(i + 1)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = TextCellValue(rep.academicId)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = TextCellValue(rep.fullName)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = TextCellValue(rep.location ?? 'عام')
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = IntCellValue(rep.attendedSessions)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = IntCellValue(rep.absentSessions)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = IntCellValue(rep.excusedSessions)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = IntCellValue(rep.totalScore)
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = TextCellValue('%${rep.attendancePercentage.toStringAsFixed(1)}')
+        ..cellStyle = rowStyle;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+        ..value = TextCellValue(rep.statusTag)
+        ..cellStyle = rowStyle;
+
+      for (final sess in sessions) {
+        final score = rep.sessionScores[sess.sessionId!] ?? 0;
+        final status = rep.sessionStatuses[sess.sessionId!];
+        String textVal = score > 0 ? '1' : '0';
+        if (status == 'excused') textVal = 'عذر (1)';
+
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: c++, rowIndex: currentRow))
+          ..value = TextCellValue(textVal)
+          ..cellStyle = rowStyle;
+      }
+
+      currentRow++;
+    }
+
+    // Summary Row with SUM formula across Column H (column index 7)
+    final startRow = 5;
+    final endRow = currentRow > 4 ? currentRow : 5;
+
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow))
+      ..value = TextCellValue('الإجمالي العام والمتوسطات (معادلة SUM التلقائية):')
+      ..cellStyle = sumRowStyle;
+    sheet.merge(
+      CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: currentRow),
+      CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: currentRow),
+    );
+
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: currentRow))
+      ..value = FormulaCellValue('SUM(H$startRow:H$endRow)')
+      ..cellStyle = sumRowStyle;
+
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: currentRow))
+      ..value = TextCellValue('%${avgPct.toStringAsFixed(1)}')
+      ..cellStyle = sumRowStyle;
+
+    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: currentRow))
+      ..value = TextCellValue('متوسط الحضور')
+      ..cellStyle = sumRowStyle;
+
+    sheet.setColumnWidth(0, 6);
+    sheet.setColumnWidth(1, 16);
+    sheet.setColumnWidth(2, 28);
+    sheet.setColumnWidth(3, 16);
+    sheet.setColumnWidth(4, 12);
+    sheet.setColumnWidth(5, 12);
+    sheet.setColumnWidth(6, 12);
+    sheet.setColumnWidth(7, 16);
+    sheet.setColumnWidth(8, 14);
+    sheet.setColumnWidth(9, 16);
+
+    for (int s = 0; s < sessions.length; s++) {
+      sheet.setColumnWidth(10 + s, 12);
+    }
+
+    return excel;
+  }
+
+  /// Exports Cumulative Excel File
+  static Future<File> exportCumulativeExcel({
+    required Course course,
+    required String doctorName,
+    required List<Session> sessions,
+    required List<CumulativeStudentReport> reports,
+  }) async {
+    final excel = buildCumulativeExcel(
+      course: course,
+      doctorName: doctorName,
+      sessions: sessions,
+      reports: reports,
+    );
+
+    final now = DateTime.now();
+    final dateStr = intl.DateFormat('yyyy-MM-dd').format(now);
+    final cleanCourse = course.courseName.replaceAll(' ', '_');
+    final fileName = 'رصد_تراكمي_${cleanCourse}_$dateStr.xlsx';
+
+    final tempDir = await getTemporaryDirectory();
+    final file = File('${tempDir.path}/$fileName');
+    final bytes = excel.encode();
+    if (bytes != null) {
+      await file.writeAsBytes(bytes, flush: true);
+    }
+    return file;
+  }
+
+  /// Exports Cumulative PDF File with official academic layout
+  static Future<File> exportCumulativePdf({
+    required Course course,
+    required String doctorName,
+    required List<Session> sessions,
+    required List<CumulativeStudentReport> reports,
+  }) async {
+    final pdf = pw.Document();
+    final font = await PdfGoogleFonts.cairoRegular();
+    final fontBold = await PdfGoogleFonts.cairoBold();
+
+    final now = DateTime.now();
+    final dateStr = intl.DateFormat('yyyy-MM-dd').format(now);
+    final totalStudents = reports.length;
+    final totalSessions = sessions.length;
+    final double avgPct = reports.isNotEmpty
+        ? reports.map((r) => r.attendancePercentage).reduce((a, b) => a + b) / reports.length
+        : 0.0;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        theme: pw.ThemeData.withFont(base: font, bold: fontBold),
+        textDirection: pw.TextDirection.rtl,
+        margin: const pw.EdgeInsets.all(20),
+        build: (context) => [
+          // Header
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('064E3B'),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Center(
+              child: pw.Text(
+                'سجل رصد الحضور التراكمي الشامل - منظومة ASAD الأكاديمية (جامعة القاهرة)',
+                style: pw.TextStyle(font: fontBold, fontSize: 13, color: PdfColors.white),
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // Course Metadata Row
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('E6F4EA'),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('المقرر: ${course.courseName}', style: pw.TextStyle(font: fontBold, fontSize: 9.5, color: PdfColor.fromHex('064E3B'))),
+                pw.Text('الفرقة: ${course.gradeYear}', style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('064E3B'))),
+                pw.Text('القسم: ${course.department}', style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('064E3B'))),
+                pw.Text('نوع التدريس: ${course.teachingTypeArabic}', style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('064E3B'))),
+                pw.Text('إجمالي الجلسات: $totalSessions', style: pw.TextStyle(font: fontBold, fontSize: 9.5, color: PdfColor.fromHex('064E3B'))),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 4),
+
+          // Doctor & Stats Row
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F1F5F9'),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('القائم بالتدريس: $doctorName', style: pw.TextStyle(font: fontBold, fontSize: 9.5)),
+                pw.Text('التاريخ: $dateStr', style: pw.TextStyle(font: font, fontSize: 9)),
+                pw.Text('إجمالي الطلاب: $totalStudents', style: pw.TextStyle(font: font, fontSize: 9)),
+                pw.Text('متوسط الحضور العام: %${avgPct.toStringAsFixed(1)}', style: pw.TextStyle(font: fontBold, fontSize: 9.5, color: PdfColor.fromHex('064E3B'))),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 10),
+
+          // Cumulative Table
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColor.fromHex('CBD5E1'), width: 0.5),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(22),  // م
+              1: const pw.FixedColumnWidth(55),  // الكود
+              2: const pw.FlexColumnWidth(2.6),  // اسم الطالب
+              3: const pw.FlexColumnWidth(1.4),  // المكان
+              4: const pw.FixedColumnWidth(34),  // حضور
+              5: const pw.FixedColumnWidth(34),  // غياب
+              6: const pw.FixedColumnWidth(34),  // أعذار
+              7: const pw.FixedColumnWidth(40),  // مجموع الدرجات
+              8: const pw.FixedColumnWidth(48),  // النسبة %
+              9: const pw.FixedColumnWidth(55),  // الحالة
+            },
+            children: [
+              // Header
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: PdfColor.fromHex('059669')),
+                children: [
+                  _pdfCell('م', fontBold, isHeader: true),
+                  _pdfCell('الكود', fontBold, isHeader: true),
+                  _pdfCell('اسم الطالب', fontBold, isHeader: true),
+                  _pdfCell('المكان / السكشن', fontBold, isHeader: true),
+                  _pdfCell('حضور', fontBold, isHeader: true),
+                  _pdfCell('غياب', fontBold, isHeader: true),
+                  _pdfCell('أعذار', fontBold, isHeader: true),
+                  _pdfCell('الدرجات', fontBold, isHeader: true),
+                  _pdfCell('النسبة %', fontBold, isHeader: true),
+                  _pdfCell('الحالة', fontBold, isHeader: true),
+                ],
+              ),
+              // Data Rows
+              for (int i = 0; i < reports.length; i++)
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(
+                    color: reports[i].isDeprived
+                        ? PdfColor.fromHex('FEF2F2')
+                        : (reports[i].isAtRisk
+                            ? PdfColor.fromHex('FEF3C7')
+                            : (i % 2 == 0 ? PdfColor.fromHex('FAFAFA') : PdfColors.white)),
+                  ),
+                  children: [
+                    _pdfCell('${i + 1}', font),
+                    _pdfCell(reports[i].academicId, font),
+                    _pdfCell(reports[i].fullName, fontBold),
+                    _pdfCell(reports[i].location ?? 'عام', font),
+                    _pdfCell('${reports[i].attendedSessions}', fontBold, color: PdfColor.fromHex('059669')),
+                    _pdfCell('${reports[i].absentSessions}', font, color: reports[i].absentSessions > 0 ? PdfColor.fromHex('DC2626') : null),
+                    _pdfCell('${reports[i].excusedSessions}', font),
+                    _pdfCell('${reports[i].totalScore}', fontBold),
+                    _pdfCell('%${reports[i].attendancePercentage.toStringAsFixed(1)}', fontBold),
+                    _pdfCell(
+                      reports[i].statusTag,
+                      fontBold,
+                      color: reports[i].isDeprived
+                          ? PdfColor.fromHex('DC2626')
+                          : (reports[i].isAtRisk ? PdfColor.fromHex('D97706') : PdfColor.fromHex('059669')),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    final cleanCourse = course.courseName.replaceAll(' ', '_');
+    final fileName = 'رصد_تراكمي_${cleanCourse}_$dateStr.pdf';
 
     final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/$fileName');

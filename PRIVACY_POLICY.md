@@ -56,3 +56,4 @@ If you have any questions or feedback regarding this Privacy Policy, please cont
 ## 4. التواصل
 لأي استفسارات تتعلق بسياسة الخصوصية:
 - **البريد الإلكتروني:** nabilmahmoudelshaer@gmail.com
+

@@ -4,10 +4,12 @@ import '../controllers/app_state.dart';
 
 class ScanFeedbackOverlay extends StatelessWidget {
   final ScanResult? result;
+  final double topOffset;
 
   const ScanFeedbackOverlay({
     super.key,
     required this.result,
+    this.topOffset = 95.0,
   });
 
   @override
@@ -69,22 +71,24 @@ class ScanFeedbackOverlay extends StatelessWidget {
               border: Border.all(color: borderColor, width: 6),
             ),
           ),
-          // Top / Center Floating Banner
+          // Top Floating Alert Card positioned below the session counter bar
           Positioned(
-            top: 24,
-            left: 20,
-            right: 20,
+            top: topOffset,
+            left: 16,
+            right: 16,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutCubic,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: bannerColor.withOpacity(0.95),
-                borderRadius: BorderRadius.circular(14),
+                color: bannerColor.withOpacity(0.96),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white30, width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: bannerColor.withOpacity(0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.55),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
