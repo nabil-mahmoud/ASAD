@@ -47,6 +47,13 @@ class DatabaseHelper {
         await db.execute('PRAGMA foreign_keys = ON;');
       },
       onCreate: _onCreate,
+      onOpen: (db) async {
+        try {
+          await db.execute("ALTER TABLE Sessions ADD COLUMN status TEXT DEFAULT 'completed';");
+        } catch (_) {
+          // Column already exists
+        }
+      },
     );
   }
 
@@ -93,6 +100,7 @@ class DatabaseHelper {
         session_type TEXT CHECK(session_type IN ('lecture', 'lab_theory', 'lab_practical')),
         location TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        status TEXT DEFAULT 'completed',
         FOREIGN KEY (course_id) REFERENCES Courses (course_id) ON DELETE CASCADE
       );
     ''');
@@ -322,6 +330,7 @@ class DatabaseHelper {
         s.session_type,
         s.location,
         s.created_at,
+        s.status,
         c.course_name,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id) as total_students,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id AND (ar.status = 'present' OR ar.status = 'excused')) as present_count
@@ -341,6 +350,7 @@ class DatabaseHelper {
         s.session_type,
         s.location,
         s.created_at,
+        s.status,
         c.course_name,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id) as total_students,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id AND (ar.status = 'present' OR ar.status = 'excused')) as present_count
@@ -349,6 +359,31 @@ class DatabaseHelper {
       WHERE s.session_id = ?
       LIMIT 1
     ''', [sessionId]);
+    if (res.isNotEmpty) {
+      return Session.fromMap(res.first);
+    }
+    return null;
+  }
+
+  Future<Session?> getPendingSession() async {
+    final db = await database;
+    final res = await db.rawQuery('''
+      SELECT 
+        s.session_id,
+        s.course_id,
+        s.session_type,
+        s.location,
+        s.created_at,
+        s.status,
+        c.course_name,
+        (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id) as total_students,
+        (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id AND (ar.status = 'present' OR ar.status = 'excused')) as present_count
+      FROM Sessions s
+      LEFT JOIN Courses c ON s.course_id = c.course_id
+      WHERE s.status = 'pending'
+      ORDER BY s.session_id DESC
+      LIMIT 1
+    ''');
     if (res.isNotEmpty) {
       return Session.fromMap(res.first);
     }
@@ -390,6 +425,12 @@ class DatabaseHelper {
   /// Ensures all enrolled students not marked present or excused are saved as 'absent' with score = 0.
   Future<void> finalizeSessionAttendance(int sessionId) async {
     final db = await database;
+    await db.update(
+      'Sessions',
+      {'status': 'completed'},
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+    );
     await db.update(
       'Attendance_Records',
       {
@@ -491,6 +532,7 @@ class DatabaseHelper {
         s.session_type,
         s.location,
         s.created_at,
+        s.status,
         c.course_name,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id) as total_students,
         (SELECT COUNT(*) FROM Attendance_Records ar WHERE ar.session_id = s.session_id AND (ar.status = 'present' OR ar.status = 'excused')) as present_count

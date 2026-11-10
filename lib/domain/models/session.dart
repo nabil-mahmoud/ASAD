@@ -4,6 +4,7 @@ class Session {
   final String sessionType; // 'lecture' | 'lab_theory' | 'lab_practical'
   final String? location;
   final String createdAt;
+  final String status; // 'pending' | 'completed'
 
   // Joined/calculated fields for UI
   final String? courseName;
@@ -16,11 +17,13 @@ class Session {
     required this.sessionType,
     this.location,
     required this.createdAt,
+    this.status = 'completed',
     this.courseName,
     this.totalStudentsCount,
     this.presentCount,
   });
 
+  bool get isPending => status == 'pending';
   bool get isLecture => sessionType == 'lecture';
   bool get isLabPractical => sessionType == 'lab_practical';
   bool get isLabTheory => sessionType == 'lab_theory';
@@ -54,6 +57,7 @@ class Session {
       'session_type': sessionType,
       'location': location,
       'created_at': createdAt,
+      'status': status,
     };
   }
 
@@ -64,6 +68,7 @@ class Session {
       sessionType: map['session_type'] as String,
       location: map['location'] as String?,
       createdAt: map['created_at'] as String,
+      status: (map['status'] as String?) ?? 'completed',
       courseName: map['course_name'] as String?,
       totalStudentsCount: map['total_students'] as int?,
       presentCount: map['present_count'] as int?,
@@ -76,6 +81,7 @@ class Session {
     String? sessionType,
     String? location,
     String? createdAt,
+    String? status,
     String? courseName,
     int? totalStudentsCount,
     int? presentCount,
@@ -86,6 +92,7 @@ class Session {
       sessionType: sessionType ?? this.sessionType,
       location: location ?? this.location,
       createdAt: createdAt ?? this.createdAt,
+      status: status ?? this.status,
       courseName: courseName ?? this.courseName,
       totalStudentsCount: totalStudentsCount ?? this.totalStudentsCount,
       presentCount: presentCount ?? this.presentCount,

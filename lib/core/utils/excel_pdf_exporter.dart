@@ -89,7 +89,7 @@ class ExcelPdfExporter {
 
     // Row 1: Header Block - Title (كشف حضور وغياب الطلاب)
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        TextCellValue('كشف حضور وغياب الطلاب - منظومة ASAD الذكية (جامعة القاهرة)');
+        TextCellValue('كشف حضور وغياب الطلاب - جامعة دمنهور - كلية الزراعة (منظومة ASAD)');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
@@ -306,7 +306,7 @@ class ExcelPdfExporter {
                           style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.white),
                         ),
                         pw.Text(
-                          'جامعة القاهرة - كلية الحاسبات والمعلومات',
+                          'جامعة دمنهور - كلية الزراعة',
                           style: pw.TextStyle(font: fontBold, fontSize: 13, color: PdfColors.white),
                         ),
                         pw.Text(
@@ -541,7 +541,7 @@ class ExcelPdfExporter {
 
     // Row 1: Title
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        TextCellValue('سجل رصد الحضور التراكمي الشامل - منظومة ASAD الذكية');
+        TextCellValue('سجل رصد الحضور التراكمي الشامل - جامعة دمنهور - كلية الزراعة (منظومة ASAD)');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
@@ -757,7 +757,7 @@ class ExcelPdfExporter {
             ),
             child: pw.Center(
               child: pw.Text(
-                'سجل رصد الحضور التراكمي الشامل - منظومة ASAD الأكاديمية (جامعة القاهرة)',
+                'سجل رصد الحضور التراكمي الشامل - جامعة دمنهور - كلية الزراعة (منظومة ASAD)',
                 style: pw.TextStyle(font: fontBold, fontSize: 13, color: PdfColors.white),
               ),
             ),
@@ -927,37 +927,38 @@ class ExcelPdfExporter {
       horizontalAlign: HorizontalAlign.Center,
     );
 
-    final headers = ['الكود الجامعي', 'اسم الطالب بالكامل', 'الفرقة', 'القسم العلمي', 'المكان المخصص'];
+    final headers = ['م', 'الكود الجامعي', 'اسم الطالب بالكامل', 'الفرقة', 'القسم العلمي', 'المكان المخصص'];
     for (int col = 0; col < headers.length; col++) {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
       cell.value = TextCellValue(headers[col]);
       cell.cellStyle = headerStyle;
     }
 
-    // Add sample rows from the official specification (Page 3)
+    // Add sample rows with serial column (م)
     final sampleRows = [
-      ['20261001', 'أحمد محمد إبراهيم', 'الفرقة الثانية', 'حاسبات', 'مدرج 1'],
-      ['20261002', 'محمود حسن السيد', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
-      ['20261003', 'سارة علي المنشاوي', 'الفرقة الثانية', 'نظم معلومات', 'معمل شبكات ب'],
-      ['20261004', 'كريم عادل فهمي', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
-      ['20261005', 'يوسف محمود رجب', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
-      ['20261006', 'نورهان خالد العطار', 'الفرقة الثانية', 'نظم معلومات', 'معمل شبكات ب'],
-      ['20261007', 'عمر طارق الشافعي', 'الفرقة الثانية', 'حاسبات', 'مدرج 1'],
-      ['20261008', 'منى عبد الرحمن حسن', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
+      ['1', '20261001', 'أحمد محمد إبراهيم', 'الفرقة الثانية', 'حاسبات', 'مدرج 1'],
+      ['2', '20261002', 'محمود حسن السيد', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
+      ['3', '20261003', 'سارة علي المنشاوي', 'الفرقة الثانية', 'نظم معلومات', 'معمل شبكات ب'],
+      ['4', '20261004', 'كريم عادل فهمي', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
+      ['5', '20261005', 'يوسف محمود رجب', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
+      ['6', '20261006', 'نورهان خالد العطار', 'الفرقة الثانية', 'نظم معلومات', 'معمل شبكات ب'],
+      ['7', '20261007', 'عمر طارق الشافعي', 'الفرقة الثانية', 'حاسبات', 'مدرج 1'],
+      ['8', '20261008', 'منى عبد الرحمن حسن', 'الفرقة الثانية', 'حاسبات', 'معمل برمجة أ'],
     ];
 
     for (int r = 0; r < sampleRows.length; r++) {
       for (int c = 0; c < sampleRows[r].length; c++) {
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1)).value =
-            TextCellValue(sampleRows[r][c]);
+            c == 0 ? IntCellValue(r + 1) : TextCellValue(sampleRows[r][c]);
       }
     }
 
-    sheet.setColumnWidth(0, 16);
-    sheet.setColumnWidth(1, 28);
-    sheet.setColumnWidth(2, 18);
+    sheet.setColumnWidth(0, 6);
+    sheet.setColumnWidth(1, 16);
+    sheet.setColumnWidth(2, 28);
     sheet.setColumnWidth(3, 18);
-    sheet.setColumnWidth(4, 20);
+    sheet.setColumnWidth(4, 18);
+    sheet.setColumnWidth(5, 20);
 
     final tempDir = await getTemporaryDirectory();
     final file = File('${tempDir.path}/قالب_استيراد_طلاب_الدفعة_ASAD.xlsx');
@@ -992,22 +993,48 @@ class ExcelPdfExporter {
 
       // Detect header row dynamically
       if (!headerFound) {
+        bool containsHeaderKeywords = false;
         for (int c = 0; c < rowTexts.length; c++) {
           final t = rowTexts[c].toLowerCase();
-          if (t.contains('كود') || t.contains('academic') || t.contains('id')) {
+          // Serial number column
+          if (t == 'م' || t.contains('مسلسل') || t == '#' || t == 'no' || t == 'seq') {
+            containsHeaderKeywords = true;
+            continue;
+          }
+          if (t.contains('كود') || t.contains('academic') || t.contains('جامعي') || t == 'id') {
             academicIdCol = c;
-            headerFound = true;
+            containsHeaderKeywords = true;
           } else if (t.contains('اسم') || t.contains('name') || t.contains('طالب')) {
             fullNameCol = c;
+            containsHeaderKeywords = true;
           } else if (t.contains('فرقة') || t.contains('grade') || t.contains('year')) {
             gradeYearCol = c;
+            containsHeaderKeywords = true;
           } else if (t.contains('قسم') || t.contains('dept') || t.contains('department')) {
             departmentCol = c;
-          } else if (t.contains('مكان') || t.contains('معمل') || t.contains('قاعة') || t.contains('location')) {
+            containsHeaderKeywords = true;
+          } else if (t.contains('مكان') || t.contains('معمل') || t.contains('قاعة') || t.contains('location') || t.contains('مدرج')) {
             locationCol = c;
+            containsHeaderKeywords = true;
           }
         }
-        if (headerFound) continue;
+        if (containsHeaderKeywords) {
+          headerFound = true;
+          continue;
+        }
+      }
+
+      // If no explicit header was found and this is a raw data row, check if col 0 is serial index
+      if (!headerFound && rowTexts.length >= 2) {
+        final col0IsSerial = RegExp(r'^\d{1,4}$').hasMatch(rowTexts[0]);
+        final col1IsId = RegExp(r'^\d{5,}$').hasMatch(rowTexts[1]);
+        if (col0IsSerial && col1IsId) {
+          academicIdCol = 1;
+          fullNameCol = 2;
+          gradeYearCol = 3;
+          departmentCol = 4;
+          locationCol = 5;
+        }
       }
 
       // Parse data row
@@ -1017,7 +1044,8 @@ class ExcelPdfExporter {
       final dept = _getColValue(rowTexts, departmentCol);
       final loc = _getColValue(rowTexts, locationCol);
 
-      if (id.isNotEmpty && name.isNotEmpty) {
+      // Validate that id is not header text
+      if (id.isNotEmpty && name.isNotEmpty && id != 'م' && !id.contains('كود') && !name.contains('اسم')) {
         students.add(Student(
           academicId: id,
           fullName: name,

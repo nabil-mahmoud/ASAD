@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:asad_app/core/utils/excel_pdf_exporter.dart';
@@ -75,7 +76,7 @@ void main() {
       ),
     ];
 
-    test('1. Excel Sheet is created with Arabic RTL orientation and correct title', () {
+    test('1. Excel Sheet is created with Arabic RTL orientation and correct title with Damanhour University branding', () {
       final excel = ExcelPdfExporter.buildSessionExcel(
         session: sampleSession,
         course: sampleCourse,
@@ -87,9 +88,10 @@ void main() {
       expect(sheet, isNotNull);
       expect(sheet.isRTL, isTrue);
 
-      // Row 1 (Index 0): Title Banner
+      // Row 1 (Index 0): Title Banner with Damanhour University branding
       final titleCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0));
       expect(titleCell.value?.toString(), contains('كشف حضور وغياب الطلاب'));
+      expect(titleCell.value?.toString(), contains('جامعة دمنهور - كلية الزراعة'));
     });
 
     test('2. Excel Header Block contains all official university fields', () {
@@ -251,6 +253,52 @@ void main() {
       expect(s.presentCount, 45);
       expect(s.toMap()['session_type'], 'practical');
       expect(s.toMap()['location'], 'معمل د');
+    });
+
+    test('8. Session Model pending status and serialization', () {
+      final pendingSession = Session(
+        sessionId: 100,
+        courseId: 3,
+        courseName: 'محاصيل حقلية',
+        sessionType: 'practical',
+        location: 'معمل زراعة 1',
+        createdAt: '2026-11-01T10:00:00.000',
+        status: 'pending',
+      );
+
+      expect(pendingSession.isPending, isTrue);
+      expect(pendingSession.status, 'pending');
+      expect(pendingSession.toMap()['status'], 'pending');
+
+      final completedSession = pendingSession.copyWith(status: 'completed');
+      expect(completedSession.isPending, isFalse);
+      expect(completedSession.status, 'completed');
+    });
+
+    test('9. Excel student parser handles serial number column (م) seamlessly', () async {
+      // Build dummy excel with serial column (م)
+      final excel = Excel.createExcel();
+      final sheet = excel[excel.getDefaultSheet() ?? 'Sheet1'];
+      final headers = ['م', 'الكود الجامعي', 'اسم الطالب بالكامل', 'الفرقة', 'القسم العلمي', 'المكان المخصص'];
+      for (int c = 0; c < headers.length; c++) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0)).value = TextCellValue(headers[c]);
+      }
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value = IntCellValue(1);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 1)).value = TextCellValue('20265001');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 1)).value = TextCellValue('محمود إبراهيم');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 1)).value = TextCellValue('الفرقة الرابعة');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 1)).value = TextCellValue('محاصيل');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 1)).value = TextCellValue('مدرج 2');
+
+      final bytes = excel.encode()!;
+      final parsed = await ExcelPdfExporter.parseStudentExcel(Uint8List.fromList(bytes));
+
+      expect(parsed.length, 1);
+      expect(parsed.first.academicId, '20265001');
+      expect(parsed.first.fullName, 'محمود إبراهيم');
+      expect(parsed.first.gradeYear, 'الفرقة الرابعة');
+      expect(parsed.first.department, 'محاصيل');
+      expect(parsed.first.location, 'مدرج 2');
     });
   });
 }

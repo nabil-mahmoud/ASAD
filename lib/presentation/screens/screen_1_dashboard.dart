@@ -6,6 +6,7 @@ import '../widgets/offline_indicator_pill.dart';
 import 'screen_2_courses.dart';
 import 'screen_3_importer.dart';
 import 'screen_4_launcher.dart';
+import 'screen_5_scanner.dart';
 import 'screen_6_archive.dart';
 import 'screen_7_cumulative_reports.dart';
 import 'screen_8_settings.dart';
@@ -136,6 +137,10 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                     ),
                     const SizedBox(height: 20),
 
+                    // Pending / Ongoing Active Session Banner
+                    if (_appState.hasPendingSession)
+                      _buildPendingSessionBanner(context),
+
                     // 2. Quick Action: Prominent Start Session CTA
                     Container(
                       decoration: BoxDecoration(
@@ -156,7 +161,7 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed: () {
+                        onPressed: () async {
                           if (_appState.courses.isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -169,6 +174,46 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                             );
                             return;
                           }
+
+                          if (_appState.hasPendingSession) {
+                            final choice = await showDialog<String>(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: AppColors.surfaceDark,
+                                title: const Text('تنبيه: توجد جلسة جارية'),
+                                content: Text(
+                                  'توجد حالياً جلسة معلقة لمقرر (${_appState.activeCourse?.courseName ?? "المقرر"}).\nهل تريد استئنافها أم إنهاؤها وبدء جلسة جديدة؟',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, 'cancel'),
+                                    child: const Text('تراجع'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx, 'new'),
+                                    child: const Text('بدء جلسة جديدة'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.emerald),
+                                    onPressed: () => Navigator.pop(ctx, 'resume'),
+                                    child: const Text('استئناف الجلسة الجارية'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (choice == 'resume') {
+                              if (context.mounted) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const Screen5Scanner()),
+                                );
+                              }
+                              return;
+                            } else if (choice != 'new') {
+                              return;
+                            }
+                          }
+
+                          if (!context.mounted) return;
                           Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const Screen4Launcher()),
                           );
@@ -375,6 +420,156 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPendingSessionBanner(BuildContext context) {
+    final session = _appState.activeSession!;
+    final course = _appState.activeCourse;
+    final presentCount = _appState.activePresentCount;
+    final totalCount = _appState.activeTotalTargetCount;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.warningYellow, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.warningYellow.withOpacity(0.2),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.warningYellow.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.pause_circle_filled_rounded, color: AppColors.warningYellow, size: 22),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'جلسة حضور جارية (معلقة)',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warningYellow,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.royalDark,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.emerald.withOpacity(0.4)),
+                ),
+                child: Text(
+                  '$presentCount / $totalCount حاضر',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '${course?.courseName ?? "المقرر"} • ${session.sessionTypeArabic} • ${session.location ?? "الكل"}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'تم تعليق هذه الجلسة تلقائياً لضمان عدم إغلاقها عن طريق الخطأ. يمكنك استئناف مسح الطلاب أو حفظها الآن.',
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.emerald,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const Screen5Scanner()),
+                    );
+                  },
+                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                  label: const Text(
+                    'استئناف المسح بالقاعة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textLight,
+                    side: const BorderSide(color: AppColors.surfaceCardBorder),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    await _appState.finalizeAndSaveSession();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('تم إنهاء الجلسة وحفظها في الأرشيف بنجاح'),
+                          backgroundColor: AppColors.emerald,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('إنهاء وحفظ', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRed),
+                tooltip: 'إلغاء وحذف الجلسة',
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: AppColors.surfaceDark,
+                      title: const Text('إلغاء الجلسة المعلقة'),
+                      content: const Text('هل أنت متأكد من حذف هذه الجلسة المعلقة بالكامل؟'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('تراجع')),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.dangerRed),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('حذف الجلسة'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await _appState.cancelActiveSession();
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -91,6 +91,8 @@ class AppState extends ChangeNotifier {
 
   DateTime? _lastScanTime;
 
+  bool get hasPendingSession => _activeSession != null && _activeSession!.isPending;
+
   Future<void> init() async {
     _isLoading = true;
     notifyListeners();
@@ -110,6 +112,14 @@ class AppState extends ChangeNotifier {
     _uniqueGradeYears = await _db.getAllUniqueGradeYears();
     _uniqueDepartments = await _db.getAllUniqueDepartments();
     _uniqueLocations = await _db.getAllUniqueLocations();
+
+    // Check for any persisted pending session if none is currently active
+    if (_activeSession == null) {
+      final pending = await _db.getPendingSession();
+      if (pending != null) {
+        await resumeOrLoadSession(pending);
+      }
+    }
     notifyListeners();
   }
 
@@ -175,6 +185,7 @@ class AppState extends ChangeNotifier {
       sessionType: sessionType,
       location: location,
       createdAt: now,
+      status: 'pending',
       courseName: course.courseName,
     );
 
@@ -431,9 +442,18 @@ class AppState extends ChangeNotifier {
     if (_activeSession?.sessionId != null) {
       final sessionId = _activeSession!.sessionId!;
       await _db.finalizeSessionAttendance(sessionId);
+      _activeSession = _activeSession!.copyWith(status: 'completed');
       await loadActiveSessionRecords();
       await refreshAll();
     }
+  }
+
+  /// Cancel and permanently discard the active pending session
+  Future<void> cancelActiveSession() async {
+    if (_activeSession?.sessionId != null) {
+      await _db.deleteSession(_activeSession!.sessionId!);
+    }
+    await endActiveSession();
   }
 
   Future<void> endActiveSession() async {

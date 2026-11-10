@@ -36,6 +36,10 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
     super.initState();
     _appState.addListener(_onStateChange);
     _initScanner();
+    // Auto-start camera immediately upon screen entrance after the first frame callback
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startScanner();
+    });
   }
 
   void _initScanner() {
@@ -52,7 +56,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
         detectionTimeoutMs: 1500,
         facing: CameraFacing.back,
         torchEnabled: false,
-        autoStart: true,
+        autoStart: false,
       );
     } catch (e) {
       debugPrint('MobileScanner init error (desktop/web): $e');
@@ -75,6 +79,62 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
     } catch (e) {
       debugPrint('Start camera error: $e');
     }
+  }
+
+  Future<bool> _handleExitPrompt() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.pause_circle_outline_rounded, color: AppColors.mintAccent, size: 26),
+            SizedBox(width: 8),
+            Text('مغادرة قاعة المسح'),
+          ],
+        ),
+        content: const Text(
+          'هل تريد الخروج من شاشة المسح؟\n\n'
+          '• ستظل هذه الجلسة معلقة وجارية في لوحة التحكم، ويمكنك استئناف المسح بالقاعة في أي وقت.\n'
+          '• لن يتم إغلاق أو فقدان أي سجلات حضور تم مسحها.',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'stay'),
+            child: const Text('البقاء في القاعة'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.dangerRed),
+            onPressed: () => Navigator.pop(ctx, 'cancel'),
+            child: const Text('إلغاء وحذف الجلسة'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emerald,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, 'leave'),
+            child: const Text('الخروج ومتابعة لاحقاً'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == 'leave') {
+      try {
+        await _scannerController?.stop();
+      } catch (_) {}
+      return true;
+    } else if (result == 'cancel') {
+      try {
+        await _scannerController?.stop();
+      } catch (_) {}
+      await _appState.cancelActiveSession();
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -657,252 +717,274 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
     final totalCount = _appState.activeTotalTargetCount;
     final percentage = totalCount > 0 ? ((presentCount / totalCount) * 100).toInt() : 0;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: AppColors.surfaceDark.withOpacity(0.95),
-        title: Column(
-          children: [
-            Text(
-              course?.courseName ?? 'جلسة الحضور',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (!didPop) {
+          final canExit = await _handleExitPrompt();
+          if (canExit && context.mounted) {
+            Navigator.pop(context);
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: AppColors.surfaceDark.withOpacity(0.95),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            tooltip: 'مغادرة قاعة المسح',
+            onPressed: () async {
+              final canExit = await _handleExitPrompt();
+              if (canExit && context.mounted) {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          title: Column(
+            children: [
+              Text(
+                course?.courseName ?? 'جلسة الحضور',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                '${session?.sessionTypeArabic ?? ''} • ${session?.location ?? 'الكل'}',
+                style: const TextStyle(fontSize: 11, color: AppColors.mintAccent),
+              ),
+            ],
+          ),
+          actions: [
+            // Torch Button (زر الفلاش للإنارة بالمدرجات المظلمة)
+            IconButton(
+              icon: Icon(
+                _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                color: _isTorchOn ? const Color(0xFFFBBF24) : AppColors.textLight,
+              ),
+              tooltip: 'كشاف الإضاءة (Torch)',
+              onPressed: _toggleTorch,
             ),
-            Text(
-              '${session?.sessionTypeArabic ?? ''} • ${session?.location ?? 'الكل'}',
-              style: const TextStyle(fontSize: 11, color: AppColors.mintAccent),
+            // Manual attendance sheet
+            IconButton(
+              icon: const Icon(Icons.manage_search_rounded, color: AppColors.mintAccent),
+              tooltip: 'التحضير اليدوي والأعذار',
+              onPressed: _showManualAttendanceSheet,
             ),
           ],
         ),
-        actions: [
-          // Torch Button (زر الفلاش للإنارة بالمدرجات المظلمة)
-          IconButton(
-            icon: Icon(
-              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-              color: _isTorchOn ? const Color(0xFFFBBF24) : AppColors.textLight,
+        body: Stack(
+          children: [
+            // 1. Live Camera Feed (or fallback simulator)
+            Positioned.fill(
+              child: _buildCameraFeed(),
             ),
-            tooltip: 'كشاف الإضاءة (Torch)',
-            onPressed: _toggleTorch,
-          ),
-          // Manual attendance sheet
-          IconButton(
-            icon: const Icon(Icons.manage_search_rounded, color: AppColors.mintAccent),
-            tooltip: 'التحضير اليدوي والأعذار',
-            onPressed: _showManualAttendanceSheet,
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          // 1. Live Camera Feed (or fallback simulator)
-          Positioned.fill(
-            child: _buildCameraFeed(),
-          ),
 
-          // 2. Optical Scanning Viewfinder Reticle & Guidelines
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: Container(
-                  width: 280,
-                  height: 280,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: AppColors.emerald.withOpacity(0.85),
-                      width: 2.5,
+            // 2. Optical Scanning Viewfinder Reticle & Guidelines
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: AppColors.emerald.withOpacity(0.85),
+                        width: 2.5,
+                      ),
                     ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // 4 Green QR corner markers
-                      Positioned(top: 0, left: 0, child: _corner(true, true)),
-                      Positioned(top: 0, right: 0, child: _corner(false, true)),
-                      Positioned(bottom: 0, left: 0, child: _corner(true, false)),
-                      Positioned(bottom: 0, right: 0, child: _corner(false, false)),
-                      // Center guideline hint
-                      Center(
-                        child: Text(
-                          'وجّه الكاميرا نحو باركود أو QR الكارنيه',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                    child: Stack(
+                      children: [
+                        // 4 Green QR corner markers
+                        Positioned(top: 0, left: 0, child: _corner(true, true)),
+                        Positioned(top: 0, right: 0, child: _corner(false, true)),
+                        Positioned(bottom: 0, left: 0, child: _corner(true, false)),
+                        Positioned(bottom: 0, right: 0, child: _corner(false, false)),
+                        // Center guideline hint
+                        Center(
+                          child: Text(
+                            'وجّه الكاميرا نحو باركود أو QR الكارنيه',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          // 3. Audio/Visual/Haptic Instant Response Overlay (positioned below Counter Bar)
-          ScanFeedbackOverlay(
-            result: _appState.lastScanResult,
-            topOffset: 92.0,
-          ),
+            // 3. Audio/Visual/Haptic Instant Response Overlay (positioned below Counter Bar)
+            ScanFeedbackOverlay(
+              result: _appState.lastScanResult,
+              topOffset: 92.0,
+            ),
 
-          // 4. Live Counter Bar (شريط العداد اللحظي)
-          Positioned(
-            top: 12,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceDark.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.surfaceCardBorder),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.people_alt_rounded, color: AppColors.mintAccent, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'الحضور: $presentCount / $totalCount',
+            // 4. Live Counter Bar (شريط العداد اللحظي)
+            Positioned(
+              top: 12,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceDark.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.surfaceCardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.5),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.people_alt_rounded, color: AppColors.mintAccent, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'الحضور: $presentCount / $totalCount',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.royalDark,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
+                          ),
+                          child: Text(
+                            '%$percentage',
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.mintAccent,
                             ),
                           ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.royalDark,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
                         ),
-                        child: Text(
-                          '%$percentage',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.mintAccent,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Progress Bar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: totalCount > 0 ? (presentCount / totalCount).clamp(0.0, 1.0) : 0.0,
-                      backgroundColor: AppColors.surfaceCard,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.emerald),
-                      minHeight: 7,
+                      ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    // Progress Bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: totalCount > 0 ? (presentCount / totalCount).clamp(0.0, 1.0) : 0.0,
+                        backgroundColor: AppColors.surfaceCard,
+                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.emerald),
+                        minHeight: 7,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
 
 
-          // 5. Floating "افتح الكاميرا" Button (يظهر إذا لم تكن الكاميرا تعمل)
-          if (_scannerController != null)
-            ValueListenableBuilder<MobileScannerState>(
-              valueListenable: _scannerController!,
-              builder: (context, state, _) {
-                if (state.isRunning) return const SizedBox.shrink();
-                return Positioned(
-                  bottom: 85,
-                  left: 24,
-                  right: 24,
-                  child: Center(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.emerald.withOpacity(0.55),
-                            blurRadius: 18,
-                            offset: const Offset(0, 4),
+            // 5. Floating "افتح الكاميرا" Button (يظهر إذا لم تكن الكاميرا تعمل)
+            Positioned(
+              bottom: 85,
+              left: 24,
+              right: 24,
+              child: _scannerController == null
+                  ? const SizedBox.shrink()
+                  : ValueListenableBuilder<MobileScannerState>(
+                      valueListenable: _scannerController!,
+                      builder: (context, state, _) {
+                        if (state.isRunning) return const SizedBox.shrink();
+                        return Center(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.emerald.withOpacity(0.55),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.emerald,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                                elevation: 6,
+                              ),
+                              onPressed: _startScanner,
+                              icon: const Icon(Icons.camera_alt_rounded, size: 24),
+                              label: const Text(
+                                'افتح الكاميرا',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                        );
+                      },
+                    ),
+            ),
+
+            // 6. Bottom Finish & Save Bar
+            Positioned(
+              bottom: 16,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.emerald,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          elevation: 6,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: _startScanner,
-                        icon: const Icon(Icons.camera_alt_rounded, size: 24),
+                        onPressed: _finishSessionAndNavigateToArchive,
+                        icon: const Icon(Icons.save_rounded),
                         label: const Text(
-                          'افتح الكاميرا',
+                          'إنهاء وحفظ الجلسة',
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-
-          // 6. Bottom Finish & Save Bar
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: Row(
-              children: [
-                Expanded(
-                  child: SizedBox(
+                  const SizedBox(width: 10),
+                  Container(
                     height: 52,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.emerald,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      ),
-                      onPressed: _finishSessionAndNavigateToArchive,
-                      icon: const Icon(Icons.save_rounded),
-                      label: const Text(
-                        'إنهاء وحفظ الجلسة',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceDark,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.surfaceCardBorder),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.person_search_rounded, color: AppColors.mintAccent),
+                      tooltip: 'التحضير اليدوي',
+                      onPressed: _showManualAttendanceSheet,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceDark,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.surfaceCardBorder),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.person_search_rounded, color: AppColors.mintAccent),
-                    tooltip: 'التحضير اليدوي',
-                    onPressed: _showManualAttendanceSheet,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

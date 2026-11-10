@@ -7,6 +7,7 @@ import '../../domain/models/attendance_record.dart';
 import '../../domain/models/course.dart';
 import '../../domain/models/session.dart';
 import '../controllers/app_state.dart';
+import 'screen_5_scanner.dart';
 
 class Screen6Archive extends StatefulWidget {
   const Screen6Archive({super.key});
@@ -234,6 +235,7 @@ class _SessionDetailsScreen extends StatefulWidget {
 
 class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
   final AppState _appState = AppState();
+  final DatabaseHelper _db = DatabaseHelper();
 
   late List<AttendanceRecord> _records;
   bool _isExporting = false;
@@ -242,6 +244,33 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
   void initState() {
     super.initState();
     _records = widget.records;
+  }
+
+  Future<void> _resumeScanningSession() async {
+    // 1. Resume this session in AppState
+    await _appState.resumeOrLoadSession(widget.session);
+
+    if (!mounted) return;
+
+    // 2. Open Screen5Scanner
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const Screen5Scanner()),
+    );
+
+    // 3. Upon returning, reload attendance records and update UI
+    final updated = await _db.getSessionRecords(widget.session.sessionId!);
+    if (mounted) {
+      setState(() {
+        _records = updated;
+      });
+      widget.onRefreshNeeded();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم تحديث وحفظ سجلات الحضور للجلسة بنجاح'),
+          backgroundColor: AppColors.emerald,
+        ),
+      );
+    }
   }
 
   Future<void> _exportExcel() async {
@@ -388,7 +417,26 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
+                // Resume Scanning CTA Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.emerald,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _isExporting ? null : _resumeScanningSession,
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                    label: const Text(
+                      'استئناف / مسح QR إضافي لهذه الجلسة',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 // Export Action Buttons Row
                 Row(
                   children: [
