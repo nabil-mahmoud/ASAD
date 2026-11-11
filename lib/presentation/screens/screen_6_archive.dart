@@ -65,6 +65,107 @@ class _Screen6ArchiveState extends State<Screen6Archive> {
     );
   }
 
+  Future<void> _confirmDeleteSession(Session session) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.dangerRed, width: 1.2),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_forever_rounded, color: AppColors.dangerRed, size: 26),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'حذف المحاضرة من الأرشيف',
+                style: TextStyle(
+                  color: AppColors.dangerRed,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'هل أنت متأكد من حذف هذه المحاضرة نهائياً؟',
+              style: TextStyle(color: AppColors.textLight, fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.lightBlue,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.lightBlueBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'المقرر: ${session.courseName ?? "مقرر"}',
+                    style: const TextStyle(color: AppColors.primaryBlue, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'النوع: ${session.sessionTypeArabic}',
+                    style: const TextStyle(color: AppColors.accentBlue, fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'التاريخ: ${session.createdAt.split("T").first}',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'سيتم حذف سجلات حضور هذه الجلسة نهائياً من الذاكرة المحلية.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('إلغاء', style: TextStyle(color: AppColors.textLight)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.dangerRed,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_rounded, size: 18),
+            label: const Text('تأكيد الحذف'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && session.sessionId != null) {
+      await _appState.deleteSession(session.sessionId!);
+      await _loadSessions();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف المحاضرة وسجلاتها بنجاح'),
+            backgroundColor: AppColors.emerald,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,14 +295,26 @@ class _Screen6ArchiveState extends State<Screen6Archive> {
                                   formattedDate,
                                   style: const TextStyle(fontSize: 11, color: AppColors.textDim),
                                 ),
-                                const Row(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      'عرض وتصدير',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.mintAccent),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppColors.dangerRed),
+                                      tooltip: 'حذف هذه المحاضرة',
+                                      visualDensity: VisualDensity.compact,
+                                      onPressed: () => _confirmDeleteSession(s),
                                     ),
-                                    SizedBox(width: 4),
-                                    Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.mintAccent),
+                                    const SizedBox(width: 4),
+                                    const Row(
+                                      children: [
+                                        Text(
+                                          'عرض وتصدير',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.mintAccent),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.mintAccent),
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ],
@@ -361,6 +474,290 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
     }
   }
 
+  Future<void> _showManualAttendanceSheet(AttendanceRecord rec) async {
+    if (rec.recordId == null) return;
+    final noteController = TextEditingController(text: rec.notes ?? '');
+    String selectedStatus = rec.status; // 'present' | 'absent' | 'excused'
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCardBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightBlue,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.how_to_reg_rounded, color: AppColors.primaryBlue, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          rec.studentName ?? 'طالب',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textLight),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'كود الطالب: ${rec.academicId}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'تحديد حالة الحضور والدرجة:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textLight),
+              ),
+              const SizedBox(height: 12),
+              _attendanceOptionTile(
+                title: 'حاضر (1 درجة)',
+                subtitle: 'تسجيل الطالب كحاضر في هذه الجلسة',
+                icon: Icons.check_circle_rounded,
+                color: AppColors.successGreen,
+                isSelected: selectedStatus == 'present',
+                onTap: () => setSheetState(() => selectedStatus = 'present'),
+              ),
+              const SizedBox(height: 8),
+              _attendanceOptionTile(
+                title: 'معذور (1 درجة)',
+                subtitle: 'حضور رسمي بعذر مقبول (طبي / عمادة)',
+                icon: Icons.assignment_turned_in_rounded,
+                color: AppColors.primaryBlue,
+                isSelected: selectedStatus == 'excused',
+                onTap: () => setSheetState(() => selectedStatus = 'excused'),
+              ),
+              const SizedBox(height: 8),
+              _attendanceOptionTile(
+                title: 'غائب (0 درجة)',
+                subtitle: 'تسجيل الطالب كغائب في هذه الجلسة',
+                icon: Icons.cancel_rounded,
+                color: AppColors.dangerRed,
+                isSelected: selectedStatus == 'absent',
+                onTap: () => setSheetState(() => selectedStatus = 'absent'),
+              ),
+              if (selectedStatus == 'excused') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteController,
+                  decoration: const InputDecoration(
+                    labelText: 'سبب العذر أو الملاحظات (اختياري)',
+                    hintText: 'مثال: تقرير طبي / إذن رسمي',
+                    prefixIcon: Icon(Icons.note_alt_rounded, color: AppColors.primaryBlue, size: 20),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.check_rounded, size: 20),
+                label: const Text('حفظ التعديل الآن', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: () async {
+                  final newStatus = selectedStatus;
+                  final newScore = (newStatus == 'present' || newStatus == 'excused') ? 1 : 0;
+                  final notes = selectedStatus == 'excused' ? noteController.text.trim() : null;
+
+                  await _db.updateAttendanceRecordStatus(
+                    recordId: rec.recordId!,
+                    status: newStatus,
+                    score: newScore,
+                    notes: notes,
+                  );
+
+                  final updated = await _db.getSessionRecords(widget.session.sessionId!);
+                  if (sheetCtx.mounted) {
+                    Navigator.of(sheetCtx).pop();
+                  }
+                  if (mounted) {
+                    setState(() {
+                      _records = updated;
+                    });
+                    widget.onRefreshNeeded();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تم تحديث حالة الطالب "${rec.studentName ?? rec.academicId}" بنجاح'),
+                        backgroundColor: AppColors.primaryBlue,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _attendanceOptionTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.12) : AppColors.surfaceWhite,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : AppColors.surfaceCardBorder,
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isSelected ? color : AppColors.textDim, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isSelected ? color : AppColors.textLight,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_rounded, color: color, size: 18)
+            else
+              const Icon(Icons.circle_outlined, color: AppColors.textDim, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteThisSession() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.dangerRed, width: 1.2),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.delete_forever_rounded, color: AppColors.dangerRed, size: 26),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'حذف هذه المحاضرة',
+                style: TextStyle(
+                  color: AppColors.dangerRed,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'هل أنت متأكد من حذف محاضرة "${widget.course.courseName}" نهائياً من الأرشيف؟',
+              style: const TextStyle(color: AppColors.textLight, fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'سيتم حذف كافة سجلات الحضور الخاصة بهذه الجلسة نهائياً من الذاكرة المحلية.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('إلغاء', style: TextStyle(color: AppColors.textLight)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.dangerRed,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_rounded, size: 18),
+            label: const Text('تأكيد الحذف'),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && widget.session.sessionId != null) {
+      await _appState.deleteSession(widget.session.sessionId!);
+      widget.onRefreshNeeded();
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف المحاضرة وسجلاتها بنجاح'),
+            backgroundColor: AppColors.emerald,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final presentCount = _records.where((r) => r.score > 0).length;
@@ -375,6 +772,11 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
             icon: const Icon(Icons.share_rounded, color: AppColors.mintAccent),
             tooltip: 'مشاركة سريعة عبر WhatsApp / تطبيق آخر',
             onPressed: _isExporting ? null : _shareDirectly,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.dangerRed),
+            tooltip: 'حذف هذه المحاضرة من الأرشيف',
+            onPressed: _confirmDeleteThisSession,
           ),
         ],
       ),
@@ -406,13 +808,13 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.royalDark,
+                        color: AppColors.lightBlue,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
+                        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
                       ),
                       child: Text(
                         'الحضور: $presentCount / $totalCount (%$percentage)',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.mintAccent, fontSize: 13),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue, fontSize: 13),
                       ),
                     ),
                   ],
@@ -471,15 +873,16 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
 
           // Table Header
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppColors.surfaceCard,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            color: AppColors.lightBlue,
             child: const Row(
               children: [
-                SizedBox(width: 32, child: Text('م', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                Expanded(flex: 3, child: Text('اسم الطالب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                Expanded(flex: 2, child: Text('الكود', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                Expanded(flex: 2, child: Text('الحالة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
-                SizedBox(width: 40, child: Text('الدرجة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center)),
+                SizedBox(width: 28, child: Text('م', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue))),
+                Expanded(flex: 3, child: Text('اسم الطالب', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue))),
+                Expanded(flex: 2, child: Text('الكود', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue))),
+                SizedBox(width: 64, child: Text('الحالة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue), textAlign: TextAlign.center)),
+                SizedBox(width: 34, child: Text('الدرجة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue), textAlign: TextAlign.center)),
+                SizedBox(width: 44, child: Text('تحضير', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primaryBlue), textAlign: TextAlign.center)),
               ],
             ),
           ),
@@ -494,11 +897,11 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                 final isPresent = rec.score > 0;
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   child: Row(
                     children: [
                       SizedBox(
-                        width: 32,
+                        width: 28,
                         child: Text(
                           '${index + 1}',
                           style: const TextStyle(fontSize: 12, color: AppColors.textDim),
@@ -506,11 +909,23 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                       ),
                       Expanded(
                         flex: 3,
-                        child: Text(
-                          rec.studentName ?? 'طالب',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rec.studentName ?? 'طالب',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textLight),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (rec.notes != null && rec.notes!.isNotEmpty)
+                              Text(
+                                rec.notes!,
+                                style: const TextStyle(fontSize: 10, color: AppColors.primaryBlue, fontStyle: FontStyle.italic),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
                       Expanded(
@@ -520,34 +935,56 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                           style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                         ),
                       ),
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isPresent ? AppColors.emerald.withOpacity(0.15) : AppColors.dangerRed.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            rec.statusArabic,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isPresent ? AppColors.mintAccent : AppColors.dangerRed,
+                      // Interactive Status Pill
+                      SizedBox(
+                        width: 64,
+                        child: InkWell(
+                          onTap: () => _showManualAttendanceSheet(rec),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isPresent ? AppColors.successGreen.withOpacity(0.14) : AppColors.dangerRed.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isPresent ? AppColors.successGreen.withOpacity(0.4) : AppColors.dangerRed.withOpacity(0.3),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              rec.statusArabic,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isPresent ? AppColors.successGreen : AppColors.dangerRed,
+                              ),
                             ),
                           ),
                         ),
                       ),
+                      // Score
                       SizedBox(
-                        width: 40,
+                        width: 34,
                         child: Text(
                           '${rec.score}',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w900,
-                            color: isPresent ? AppColors.mintAccent : AppColors.dangerRed,
+                            color: isPresent ? AppColors.successGreen : AppColors.dangerRed,
                           ),
                           textAlign: TextAlign.center,
+                        ),
+                      ),
+                      // Dedicated Action Button for Manual Attendance
+                      SizedBox(
+                        width: 44,
+                        child: IconButton(
+                          icon: const Icon(Icons.edit_note_rounded, color: AppColors.primaryBlue, size: 24),
+                          tooltip: 'تحضير يدوي / تعديل الحالة',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          onPressed: () => _showManualAttendanceSheet(rec),
                         ),
                       ),
                     ],
@@ -561,19 +998,19 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              color: AppColors.royalDark,
-              border: Border(top: BorderSide(color: AppColors.emerald, width: 1.5)),
+              color: AppColors.lightBlue,
+              border: Border(top: BorderSide(color: AppColors.primaryBlue, width: 1.5)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.functions_rounded, color: AppColors.mintAccent, size: 20),
+                    Icon(Icons.functions_rounded, color: AppColors.primaryBlue, size: 20),
                     SizedBox(width: 8),
                     Text(
                       'إجمالي درجات الحضور (SUM التلقائية):',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryBlue),
                     ),
                   ],
                 ),
@@ -582,7 +1019,7 @@ class _SessionDetailsScreenState extends State<_SessionDetailsScreen> {
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 14,
-                    color: AppColors.mintAccent,
+                    color: AppColors.primaryBlue,
                   ),
                 ),
               ],

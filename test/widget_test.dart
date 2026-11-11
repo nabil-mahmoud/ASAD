@@ -42,7 +42,7 @@ void main() {
       presentCount: 3,
     );
     expect(session.isLabPractical, true);
-    expect(session.sessionTypeArabic, 'درس عملي - تطبيقي');
+    expect(session.sessionTypeArabic, 'سكشن عملي');
     expect(session.attendancePercentage, 75.0);
 
     // 4. Attendance Record test
@@ -59,7 +59,7 @@ void main() {
     expect(record.statusArabic, 'حاضر');
   });
 
-  testWidgets('ASAD Emblem renders correctly with official branding', (WidgetTester tester) async {
+  testWidgets('DMU Emblem renders correctly with official branding', (WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -71,7 +71,7 @@ void main() {
     );
 
     expect(find.byType(AsadEmblem), findsOneWidget);
-    expect(find.text('ASAD'), findsOneWidget);
-    expect(find.text('منظومة الحضور الأكاديمي الذكي'), findsOneWidget);
+    expect(find.text('DMU'), findsOneWidget);
+    expect(find.text('جامعة دمنهور - Damanhour University'), findsOneWidget);
   });
 }

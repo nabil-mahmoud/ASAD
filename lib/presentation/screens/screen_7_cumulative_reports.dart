@@ -421,7 +421,7 @@ class _Screen7CumulativeReportsState extends State<Screen7CumulativeReports> {
                       const SizedBox(width: 8),
                       _metricBadge('الدرجات', '${rep.totalScore}', AppColors.mintAccent),
                       const SizedBox(width: 8),
-                      _metricBadge('النسبة', '%${rep.attendancePercentage.toStringAsFixed(1)}', Colors.white),
+                      _metricBadge('النسبة', '%${rep.attendancePercentage.toStringAsFixed(1)}', AppColors.primaryBlue),
                     ],
                   ),
                   const SizedBox(height: 16),

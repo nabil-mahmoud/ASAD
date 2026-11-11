@@ -96,7 +96,7 @@ class _Screen3ImporterState extends State<Screen3Importer> {
 
   Future<void> _downloadTemplate() async {
     final file = await ExcelPdfExporter.generateImportTemplate();
-    await ExcelPdfExporter.shareFile(file, 'قالب استيراد طلاب الدفعة - ASAD');
+    await ExcelPdfExporter.shareFile(file, 'قالب استيراد طلاب الدفعة - DMU');
   }
 
   Future<void> _clearAllStudentsDialog() async {

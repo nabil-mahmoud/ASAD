@@ -44,9 +44,9 @@ class _AsadAppState extends State<AsadApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ASAD',
+      title: 'DMU',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      theme: AppTheme.lightTheme,
       locale: const Locale('ar'),
       supportedLocales: const [
         Locale('ar'),
@@ -71,11 +71,11 @@ class _AsadAppState extends State<AsadApp> {
               AsadEmblem(size: 130),
               SizedBox(height: 32),
               CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.emerald),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryBlue),
               ),
               SizedBox(height: 16),
               Text(
-                'تهيئة قاعدة البيانات المشفرة محلياً...',
+                'جاري فتح النظام وتحميل البيانات...',
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13),
               ),
             ],

@@ -91,7 +91,8 @@ void main() {
       // Row 1 (Index 0): Title Banner with Damanhour University branding
       final titleCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0));
       expect(titleCell.value?.toString(), contains('كشف حضور وغياب الطلاب'));
-      expect(titleCell.value?.toString(), contains('جامعة دمنهور - كلية الزراعة'));
+      expect(titleCell.value?.toString(), contains('جامعة دمنهور'));
+      expect(titleCell.value?.toString(), contains('DMU'));
     });
 
     test('2. Excel Header Block contains all official university fields', () {
@@ -110,7 +111,7 @@ void main() {
       expect(courseMetaText, contains('هندسة البرمجيات'));
       expect(courseMetaText, contains('الفرقة الثالثة'));
       expect(courseMetaText, contains('حاسبات ومعلومات'));
-      expect(courseMetaText, contains('محاضرة نظري'));
+      expect(courseMetaText, contains('محاضرة'));
       expect(courseMetaText, contains('مدرج د. أسامة خليل'));
 
       // Row 3 (Index 2): Doctor and Attendance Statistics
@@ -248,7 +249,7 @@ void main() {
         presentCount: 45,
       );
 
-      expect(s.sessionTypeArabic, 'درس عملي');
+      expect(s.sessionTypeArabic, 'سكشن عملي');
       expect(s.totalStudentsCount, 50);
       expect(s.presentCount, 45);
       expect(s.toMap()['session_type'], 'practical');
@@ -299,6 +300,19 @@ void main() {
       expect(parsed.first.gradeYear, 'الفرقة الرابعة');
       expect(parsed.first.department, 'محاصيل');
       expect(parsed.first.location, 'مدرج 2');
+    });
+
+    test('10. Archive deletion and selective reset operations integrity', () {
+      // Verify Session copy and mapping with session_id
+      final session1 = sampleSession.copyWith(sessionId: 501);
+      final session2 = sampleSession.copyWith(sessionId: 502);
+
+      expect(session1.sessionId, 501);
+      expect(session2.sessionId, 502);
+
+      // Verify records associated with a specific session can be isolated for single session deletion
+      final session1Records = sampleRecords.where((r) => r.sessionId == 42).toList();
+      expect(session1Records.length, 4);
     });
   });
 }

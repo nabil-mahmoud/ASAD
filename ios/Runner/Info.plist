@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>ASAD</string>
+	<string>DMU</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ASAD</string>
+	<string>DMU</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -67,6 +67,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>يحتاج نظام ASAD للوصول إلى الكاميرا لمسح كود كارنيهات الطلاب لتسجيل الحضور فورياً بدون إنترنت.</string>
+	<string>يحتاج نظام DMU للوصول إلى الكاميرا لمسح كود كارنيهات الطلاب لتسجيل الحضور والغياب.</string>
 </dict>
 </plist>

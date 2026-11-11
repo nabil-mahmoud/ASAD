@@ -141,8 +141,15 @@ class AppState extends ChangeNotifier {
   }
 
   // Doctor Profile
-  Future<void> saveDoctorName(String name) async {
-    await _db.saveDoctorProfile(name.trim());
+  Future<void> saveDoctorProfile({required String name, String? facultyName}) async {
+    await _db.saveDoctorProfile(name: name.trim(), facultyName: facultyName?.trim());
+    _doctorProfile = await _db.getDoctorProfile();
+    notifyListeners();
+  }
+
+  Future<void> saveDoctorName(String name, {String? facultyName}) async {
+    final college = facultyName ?? _doctorProfile?.facultyName;
+    await _db.saveDoctorProfile(name: name.trim(), facultyName: college?.trim());
     _doctorProfile = await _db.getDoctorProfile();
     notifyListeners();
   }
@@ -194,8 +201,8 @@ class AppState extends ChangeNotifier {
 
     // Filter target students roster based on session type and course/location
     List<Student> targetStudents;
-    if (sessionType == 'lecture') {
-      // General lecture: students of this grade and department
+    if (sessionType == 'lecture' || sessionType == 'lab_theory' || sessionType == 'theory') {
+      // General lecture or theory section: all students of this grade and department
       targetStudents = await _db.getStudents(
         gradeYear: course.gradeYear,
         department: course.department,
@@ -468,7 +475,49 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> deleteSession(int sessionId) async {
+    if (_activeSession?.sessionId == sessionId) {
+      _activeSession = null;
+      _activeCourse = null;
+      _presentInSession.clear();
+      _sessionStudentsCache.clear();
+      _activeSessionRecords.clear();
+      _lastScanResult = null;
+      _lastScanTime = null;
+    }
     await _db.deleteSession(sessionId);
+    await refreshAll();
+  }
+
+  /// Clears only the sessions archive while preserving courses and students roster
+  Future<void> clearSessionsArchive() async {
+    _activeSession = null;
+    _activeCourse = null;
+    _presentInSession.clear();
+    _sessionStudentsCache.clear();
+    _activeSessionRecords.clear();
+    _lastScanResult = null;
+    _lastScanTime = null;
+    await _db.clearAllSessionsArchive();
+    await refreshAll();
+  }
+
+  /// Clears students roster only while preserving courses and past sessions
+  Future<void> clearAllStudents() async {
+    _sessionStudentsCache.clear();
+    await _db.clearAllStudents();
+    await refreshAll();
+  }
+
+  /// Clears courses and their related sessions while preserving students roster
+  Future<void> clearCoursesAndSessions() async {
+    _activeSession = null;
+    _activeCourse = null;
+    _presentInSession.clear();
+    _sessionStudentsCache.clear();
+    _activeSessionRecords.clear();
+    _lastScanResult = null;
+    _lastScanTime = null;
+    await _db.clearCoursesAndSessions();
     await refreshAll();
   }
 

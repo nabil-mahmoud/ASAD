@@ -53,6 +53,11 @@ class DatabaseHelper {
         } catch (_) {
           // Column already exists
         }
+        try {
+          await db.execute("ALTER TABLE Doctor_Profile ADD COLUMN faculty_name TEXT;");
+        } catch (_) {
+          // Column already exists
+        }
       },
     );
   }
@@ -62,7 +67,8 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE Doctor_Profile (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        doctor_name TEXT NOT NULL
+        doctor_name TEXT NOT NULL,
+        faculty_name TEXT
       );
     ''');
 
@@ -135,15 +141,22 @@ class DatabaseHelper {
     return null;
   }
 
-  Future<void> saveDoctorProfile(String name) async {
+  Future<void> saveDoctorProfile({required String name, String? facultyName}) async {
     final db = await database;
     final current = await getDoctorProfile();
+    final data = <String, dynamic>{
+      'doctor_name': name,
+    };
+    if (facultyName != null) {
+      data['faculty_name'] = facultyName;
+    }
+
     if (current == null) {
-      await db.insert('Doctor_Profile', {'doctor_name': name});
+      await db.insert('Doctor_Profile', data);
     } else {
       await db.update(
         'Doctor_Profile',
-        {'doctor_name': name},
+        data,
         where: 'id = ?',
         whereArgs: [current.id],
       );
@@ -392,7 +405,29 @@ class DatabaseHelper {
 
   Future<void> deleteSession(int sessionId) async {
     final db = await database;
-    await db.delete('Sessions', where: 'session_id = ?', whereArgs: [sessionId]);
+    await db.transaction((txn) async {
+      await txn.delete('Attendance_Records', where: 'session_id = ?', whereArgs: [sessionId]);
+      await txn.delete('Sessions', where: 'session_id = ?', whereArgs: [sessionId]);
+    });
+  }
+
+  /// Clears only the sessions archive and attendance records while preserving courses and students
+  Future<void> clearAllSessionsArchive() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('Attendance_Records');
+      await txn.delete('Sessions');
+    });
+  }
+
+  /// Clears courses and their related sessions & attendance records while preserving students
+  Future<void> clearCoursesAndSessions() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('Attendance_Records');
+      await txn.delete('Sessions');
+      await txn.delete('Courses');
+    });
   }
 
   // ---------------- Attendance Records Operations ----------------
@@ -556,7 +591,7 @@ class DatabaseHelper {
       {
         'status': status,
         'score': score,
-        'notes': ?notes,
+        'notes': notes,
       },
       where: 'record_id = ?',
       whereArgs: [recordId],

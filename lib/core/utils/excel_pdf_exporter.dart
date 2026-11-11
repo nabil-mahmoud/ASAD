@@ -89,7 +89,7 @@ class ExcelPdfExporter {
 
     // Row 1: Header Block - Title (كشف حضور وغياب الطلاب)
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        TextCellValue('كشف حضور وغياب الطلاب - جامعة دمنهور - كلية الزراعة (منظومة ASAD)');
+        TextCellValue('كشف حضور وغياب الطلاب - جامعة دمنهور (DMU)');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
@@ -292,7 +292,7 @@ class ExcelPdfExporter {
               pw.Container(
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(
-                  color: PdfColor.fromHex('064E3B'),
+                  color: PdfColor.fromHex('0D47A1'),
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Row(
@@ -306,12 +306,12 @@ class ExcelPdfExporter {
                           style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.white),
                         ),
                         pw.Text(
-                          'جامعة دمنهور - كلية الزراعة',
+                          'جامعة دمنهور - Damanhour University',
                           style: pw.TextStyle(font: fontBold, fontSize: 13, color: PdfColors.white),
                         ),
                         pw.Text(
                           'العام الجامعي: 2026/2027',
-                          style: pw.TextStyle(font: font, fontSize: 10, color: PdfColor.fromHex('A7F3D0')),
+                          style: pw.TextStyle(font: font, fontSize: 10, color: PdfColor.fromHex('DBEAFE')),
                         ),
                       ],
                     ),
@@ -319,12 +319,12 @@ class ExcelPdfExporter {
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
                         pw.Text(
-                          'منظومة ASAD',
-                          style: pw.TextStyle(font: fontBold, fontSize: 16, color: PdfColors.white),
+                          'DMU',
+                          style: pw.TextStyle(font: fontBold, fontSize: 18, color: PdfColors.white),
                         ),
                         pw.Text(
                           'نظام تسجيل الحضور والغياب الذكي',
-                          style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('A7F3D0')),
+                          style: pw.TextStyle(font: font, fontSize: 9, color: PdfColor.fromHex('DBEAFE')),
                         ),
                       ],
                     ),
@@ -541,7 +541,7 @@ class ExcelPdfExporter {
 
     // Row 1: Title
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        TextCellValue('سجل رصد الحضور التراكمي الشامل - جامعة دمنهور - كلية الزراعة (منظومة ASAD)');
+        TextCellValue('سجل رصد الحضور التراكمي الشامل - جامعة دمنهور (DMU)');
     sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).cellStyle = titleStyle;
     sheet.merge(
       CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
@@ -757,7 +757,7 @@ class ExcelPdfExporter {
             ),
             child: pw.Center(
               child: pw.Text(
-                'سجل رصد الحضور التراكمي الشامل - جامعة دمنهور - كلية الزراعة (منظومة ASAD)',
+                'سجل رصد الحضور التراكمي الشامل - جامعة دمنهور (DMU)',
                 style: pw.TextStyle(font: fontBold, fontSize: 13, color: PdfColors.white),
               ),
             ),
@@ -909,7 +909,7 @@ class ExcelPdfExporter {
     await Share.shareXFiles(
       [XFile(file.path)],
       subject: subject,
-      text: 'مرفق كشف تسجيل الحضور والغياب الصادر من منظومة ASAD الذكية.',
+      text: 'مرفق كشف تسجيل الحضور والغياب الصادر من منظومة DMU - جامعة دمنهور.',
     );
   }
 
@@ -922,7 +922,7 @@ class ExcelPdfExporter {
     final headerStyle = CellStyle(
       bold: true,
       fontSize: 12,
-      backgroundColorHex: ExcelColor.fromHexString('#059669'),
+      backgroundColorHex: ExcelColor.fromHexString('#0D47A1'),
       fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
       horizontalAlign: HorizontalAlign.Center,
     );
@@ -961,7 +961,7 @@ class ExcelPdfExporter {
     sheet.setColumnWidth(5, 20);
 
     final tempDir = await getTemporaryDirectory();
-    final file = File('${tempDir.path}/قالب_استيراد_طلاب_الدفعة_ASAD.xlsx');
+    final file = File('${tempDir.path}/قالب_استيراد_طلاب_الدفعة_DMU.xlsx');
     final bytes = excel.encode();
     if (bytes != null) {
       await file.writeAsBytes(bytes, flush: true);

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/asad_emblem.dart';
 import '../controllers/app_state.dart';
-import '../widgets/offline_indicator_pill.dart';
+import '../widgets/app_user_guide_modal.dart';
 import 'screen_2_courses.dart';
 import 'screen_3_importer.dart';
 import 'screen_4_launcher.dart';
@@ -40,30 +40,38 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
   @override
   Widget build(BuildContext context) {
     final doctorName = _appState.doctorProfile?.doctorName ?? 'دكتور';
+    final facultyName = _appState.doctorProfile?.facultyName;
     final coursesCount = _appState.courses.length;
     final studentsCount = _appState.totalStudents;
     final sessionsCount = _appState.sessions.length;
 
     return Scaffold(
+      backgroundColor: AppColors.bgLight,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
             AsadEmblem(size: 32, showLabel: false),
             SizedBox(width: 8),
             Text(
-              'منظومة ASAD',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              'DMU',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+                color: AppColors.primaryBlue,
+              ),
             ),
           ],
         ),
         actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: OfflineIndicatorPill(compact: true),
+          IconButton(
+            icon: const Icon(Icons.help_outline_rounded, color: AppColors.primaryBlue),
+            tooltip: 'كيفية استخدام التطبيق (دليل كامل)',
+            onPressed: () => AppUserGuideModal.show(context),
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.settings_outlined, color: AppColors.primaryBlue),
             tooltip: 'الإعدادات وإدارة النظام',
             onPressed: () {
               Navigator.of(context).push(
@@ -77,7 +85,7 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => _appState.refreshAll(),
-          color: AppColors.emerald,
+          color: AppColors.primaryBlue,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -87,18 +95,18 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // 1. Header Card: Doctor Greeting + App Branding
+                    // 1. Header Card: Doctor Greeting + University Branding
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: AppColors.shieldGradient,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.emerald.withOpacity(0.5)),
+                        border: Border.all(color: AppColors.lightBlueBorder),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.royalDark.withOpacity(0.4),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
+                            color: const Color(0xFF0D47A1).withOpacity(0.06),
+                            blurRadius: 18,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
@@ -108,21 +116,36 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const OfflineIndicatorPill(),
-                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.lightBlue,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: AppColors.primaryBlue.withOpacity(0.2)),
+                                  ),
+                                  child: Text(
+                                    facultyName != null && facultyName.isNotEmpty ? facultyName : 'جامعة دمنهور',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primaryBlue,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
                                 Text(
                                   'أهلاً بك، $doctorName 👋',
                                   style: const TextStyle(
-                                    fontSize: 20,
+                                    fontSize: 19,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                    color: AppColors.primaryBlue,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 const Text(
-                                  'النظام جاهز ومستقر محلياً في المدرج بدون الحاجة لأي اتصال بالإنترنت.',
+                                  'نظام تسجيل الحضور والغياب الذكي المعتمد لجامعة دمنهور.',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 12.5,
                                     color: AppColors.textMuted,
                                     height: 1.4,
                                   ),
@@ -131,7 +154,7 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const AsadEmblem(size: 72, showLabel: false),
+                          const AsadEmblem(size: 68, showLabel: false),
                         ],
                       ),
                     ),
@@ -220,7 +243,7 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
                         },
                         icon: const Icon(Icons.qr_code_scanner_rounded, size: 28),
                         label: const Text(
-                          'بدء جلسة غياب جديدة بالقاعة',
+                          'بدء جلسة غياب جديدة',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -310,8 +333,8 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
 
                     // Module 5: الإعدادات (Settings)
                     _moduleCard(
-                      title: 'الإعدادات وسوفت وير التطبيق',
-                      subtitle: 'الملف الأكاديمي، إحصائيات النظام، وإعادة ضبط المصنع الشامل',
+                      title: 'الإعدادات وإدارة النظام',
+                      subtitle: 'الملف الأكاديمي، الكلية التابع لها، وإدارة البيانات',
                       countBadge: 'إدارة النظام',
                       badgeColor: AppColors.textDim,
                       icon: Icons.settings_rounded,
@@ -472,13 +495,13 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.royalDark,
+                  color: AppColors.lightBlue,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.emerald.withOpacity(0.4)),
+                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
                 ),
                 child: Text(
                   '$presentCount / $totalCount حاضر',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryBlue),
                 ),
               ),
             ],
@@ -486,7 +509,7 @@ class _Screen1DashboardState extends State<Screen1Dashboard> {
           const SizedBox(height: 10),
           Text(
             '${course?.courseName ?? "المقرر"} • ${session.sessionTypeArabic} • ${session.location ?? "الكل"}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textLight),
           ),
           const SizedBox(height: 4),
           const Text(

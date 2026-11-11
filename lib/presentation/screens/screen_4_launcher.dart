@@ -13,9 +13,10 @@ class Screen4Launcher extends StatefulWidget {
 
 class _Screen4LauncherState extends State<Screen4Launcher> {
   final AppState _appState = AppState();
+  final TextEditingController _customLocationController = TextEditingController();
 
   Course? _selectedCourse;
-  String _selectedSessionType = 'lecture'; // 'lecture' | 'lab_practical' | 'lab_theory'
+  String _selectedSessionType = 'lecture'; // 'lecture' | 'lab_theory' | 'lab_practical'
   String? _selectedLocation;
   List<String> _courseLocations = [];
   bool _isLaunching = false;
@@ -28,6 +29,12 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
       _adjustForCourseTeachingType();
       _updateLocationsForSelectedCourse();
     }
+  }
+
+  @override
+  void dispose() {
+    _customLocationController.dispose();
+    super.dispose();
   }
 
   Future<void> _updateLocationsForSelectedCourse() async {
@@ -51,24 +58,37 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
   void _adjustForCourseTeachingType() {
     if (_selectedCourse == null) return;
     if (_selectedCourse!.isTheoryOnly) {
-      // Force lecture type only
-      _selectedSessionType = 'lecture';
-      _selectedLocation = null;
+      // Force lecture or theory type only (hide practical lab)
+      if (_selectedSessionType == 'lab_practical') {
+        _selectedSessionType = 'lecture';
+      }
     }
   }
 
   Future<void> _launchSession() async {
     if (_selectedCourse == null) return;
 
-    if ((_selectedSessionType == 'lab_practical' || _selectedSessionType == 'lab_theory') &&
-        (_selectedLocation == null || _selectedLocation!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تحديد المكان المخصص (المعمل أو القاعة) للدرس العملي'),
-          backgroundColor: AppColors.warningYellow,
-        ),
-      );
-      return;
+    String chosenLocation;
+    if (_selectedSessionType == 'lab_practical') {
+      if (_courseLocations.isNotEmpty && (_selectedLocation == null || _selectedLocation!.isEmpty)) {
+        _selectedLocation = _courseLocations.first;
+      }
+      if (_selectedLocation == null || _selectedLocation!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('يرجى اختيار المعمل المخصص للسكشن العملي من المعامل المأخوذة من الشيت'),
+            backgroundColor: AppColors.warningYellow,
+          ),
+        );
+        return;
+      }
+      chosenLocation = _selectedLocation!;
+    } else {
+      // lecture or lab_theory: manual text field
+      final customLoc = _customLocationController.text.trim();
+      chosenLocation = customLoc.isNotEmpty
+          ? customLoc
+          : (_selectedSessionType == 'lecture' ? 'مدرج عام' : 'قاعة دراسية');
     }
 
     setState(() => _isLaunching = true);
@@ -77,7 +97,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
       await _appState.launchNewSession(
         course: _selectedCourse!,
         sessionType: _selectedSessionType,
-        location: _selectedLocation,
+        location: chosenLocation,
       );
 
       if (!mounted) return;
@@ -124,7 +144,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                       value: _selectedCourse,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.book_rounded, color: AppColors.emerald),
+                        prefixIcon: Icon(Icons.book_rounded, color: AppColors.primaryBlue),
                       ),
                       items: courses.map((c) {
                         return DropdownMenuItem<Course>(
@@ -151,30 +171,30 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                     stepNumber: 2,
                     title: 'تحديد نوع الجلسة',
                     subtitle: _selectedCourse?.isTheoryOnly == true
-                        ? 'مقرر نظري فقط: تم حجب خيارات المعامل تلقائياً منعاً للأخطاء'
-                        : 'اختر بين محاضرة عامة أو درس عملي/سكشن مقيد بالمكان',
+                        ? 'مقرر نظري فقط: تم حجب خيار المعامل الميدانية تلقائياً'
+                        : 'اختر بين محاضرة عامة أو سكشن نظري أو سكشن عملي',
                     child: Column(
                       children: [
                         _typeTile(
                           id: 'lecture',
-                          title: 'محاضرة نظري عامة',
-                          subtitle: 'مدرج عام لكامل الفرقة الدراسية',
+                          title: 'محاضرة',
+                          subtitle: 'مدرج عام / قاعة لكامل الفرقة الدراسية',
                           icon: Icons.record_voice_over_rounded,
+                        ),
+                        const SizedBox(height: 10),
+                        _typeTile(
+                          id: 'lab_theory',
+                          title: 'سكشن نظري',
+                          subtitle: 'سكشن نظري / تمارين لمجموعة بالقاعة',
+                          icon: Icons.assignment_rounded,
                         ),
                         if (_selectedCourse?.hasPractical ?? true) ...[
                           const SizedBox(height: 10),
                           _typeTile(
                             id: 'lab_practical',
-                            title: 'درس عملي - تطبيقي (معمل)',
-                            subtitle: 'مقيد بالمكان المخصص للمعمل وفلترة الطلاب',
+                            title: 'سكشن عملي',
+                            subtitle: 'مقيد بالمعمل المخصص وفلترة طلاب المعمل من الشيت',
                             icon: Icons.computer_rounded,
-                          ),
-                          const SizedBox(height: 10),
-                          _typeTile(
-                            id: 'lab_theory',
-                            title: 'سكشن نظري / تمارين',
-                            subtitle: 'سكشن لمجموعة في قاعة مخصصة',
-                            icon: Icons.assignment_rounded,
                           ),
                         ],
                       ],
@@ -182,12 +202,13 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Step 3 (For practical / lab sessions): Location Selection
-                  if (_selectedSessionType == 'lab_practical' || _selectedSessionType == 'lab_theory') ...[
+                  // Step 3: Location Selection / Input
+                  if (_selectedSessionType == 'lab_practical') ...[
+                    // For practical lab: select from sheet labs
                     _stepContainer(
                       stepNumber: 3,
-                      title: 'تحديد المكان المخصص (المعمل / القاعة)',
-                      subtitle: 'سيقيد النظام قبول المسح بطلاب هذا المكان فقط لمنع التسلل والخلط',
+                      title: 'تحديد المعمل المخصص (سكشن عملي)',
+                      subtitle: 'سيقيد النظام قبول المسح بطلاب هذا المعمل فقط المأخوذين من الشيت',
                       child: _courseLocations.isEmpty
                           ? Container(
                               padding: const EdgeInsets.all(12),
@@ -196,38 +217,58 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: AppColors.warningYellow.withOpacity(0.4)),
                               ),
-                              child: const Text(
-                                'تنبيه: لا توجد أماكن مسجلة لطلاب هذا القسم/الفرقة في كشف الطلاب المستورد.',
-                                style: TextStyle(fontSize: 12, color: AppColors.warningYellow),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, color: AppColors.warningYellow, size: 20),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'تنبيه: لا توجد معامل مسجلة لطلاب هذا القسم/الفرقة في شيت الطلاب المستورد.',
+                                      style: TextStyle(fontSize: 12, color: AppColors.warningYellow, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
                               ),
                             )
-                          : Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  value: _courseLocations.contains(_selectedLocation)
-                                      ? _selectedLocation
-                                      : (_courseLocations.isNotEmpty ? _courseLocations.first : null),
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                    prefixIcon: Icon(Icons.meeting_room_rounded, color: AppColors.emerald),
+                          : DropdownButtonFormField<String>(
+                              value: _courseLocations.contains(_selectedLocation)
+                                  ? _selectedLocation
+                                  : (_courseLocations.isNotEmpty ? _courseLocations.first : null),
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.computer_rounded, color: AppColors.primaryBlue),
+                                labelText: 'المعمل المعتمد من الشيت',
+                              ),
+                              hint: const Text('اختر المعمل من القائمة', style: TextStyle(fontSize: 13)),
+                              items: _courseLocations.map((loc) {
+                                return DropdownMenuItem<String>(
+                                  value: loc,
+                                  child: Text(
+                                    loc,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                   ),
-                                  hint: const Text('اختر المكان المخصص للدرس العملي', style: TextStyle(fontSize: 13)),
-                                  items: _courseLocations.map((loc) {
-                                    return DropdownMenuItem<String>(
-                                      value: loc,
-                                      child: Text(
-                                        loc,
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                      ),
-                                    );
-                                  }).toList(),
-                                  onChanged: (loc) {
-                                    setState(() => _selectedLocation = loc);
-                                  },
-                                ),
-                              ],
+                                );
+                              }).toList(),
+                              onChanged: (loc) {
+                                setState(() => _selectedLocation = loc);
+                              },
                             ),
+                    ),
+                    const SizedBox(height: 24),
+                  ] else ...[
+                    // For lecture or theory section: doctor types the location manually
+                    _stepContainer(
+                      stepNumber: 3,
+                      title: _selectedSessionType == 'lecture' ? 'تحديد مكان المحاضرة (المدرج / القاعة)' : 'تحديد مكان السكشن النظري (القاعة)',
+                      subtitle: 'اكتب اسم المدرج أو القاعة يدوياً لتثبيتها في تقرير الحضور',
+                      child: TextFormField(
+                        controller: _customLocationController,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.meeting_room_rounded, color: AppColors.primaryBlue),
+                          hintText: _selectedSessionType == 'lecture' ? 'اكتب اسم المدرج (مثال: مدرج 1 / مدرج الفردوس)' : 'اكتب اسم أو رقم القاعة (مثال: قاعة 204)',
+                          labelText: 'مكان الانعقاد',
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -239,7 +280,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.emerald.withOpacity(0.4),
+                          color: AppColors.primaryBlue.withOpacity(0.35),
                           blurRadius: 16,
                           offset: const Offset(0, 4),
                         ),
@@ -247,7 +288,8 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                     ),
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.emerald,
+                        backgroundColor: AppColors.primaryBlue,
+                        foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: _isLaunching ? null : _launchSession,
@@ -283,7 +325,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: AppColors.surfaceWhite,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.surfaceCardBorder),
       ),
@@ -296,7 +338,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                 width: 26,
                 height: 26,
                 decoration: const BoxDecoration(
-                  color: AppColors.emerald,
+                  color: AppColors.primaryBlue,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -345,10 +387,10 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
       onTap: () {
         setState(() {
           _selectedSessionType = id;
-          if (id == 'lecture') {
-            _selectedLocation = null;
-          } else if (_selectedLocation == null && _courseLocations.isNotEmpty) {
-            _selectedLocation = _courseLocations.first;
+          if (id == 'lab_practical') {
+            if ((_selectedLocation == null || !_courseLocations.contains(_selectedLocation)) && _courseLocations.isNotEmpty) {
+              _selectedLocation = _courseLocations.first;
+            }
           }
         });
       },
@@ -357,16 +399,16 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.emerald.withOpacity(0.18) : AppColors.surfaceDark,
+          color: isSelected ? AppColors.lightBlue : AppColors.surfaceWhite,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.emerald : AppColors.surfaceCardBorder,
+            color: isSelected ? AppColors.primaryBlue : AppColors.surfaceCardBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? AppColors.mintAccent : AppColors.textMuted, size: 24),
+            Icon(icon, color: isSelected ? AppColors.primaryBlue : AppColors.textMuted, size: 24),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -377,7 +419,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : AppColors.textLight,
+                      color: isSelected ? AppColors.primaryBlue : AppColors.textLight,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -389,7 +431,7 @@ class _Screen4LauncherState extends State<Screen4Launcher> {
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: AppColors.mintAccent, size: 20)
+              const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue, size: 20)
             else
               const Icon(Icons.circle_outlined, color: AppColors.textDim, size: 20),
           ],

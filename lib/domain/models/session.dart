@@ -31,15 +31,15 @@ class Session {
   String get sessionTypeArabic {
     switch (sessionType) {
       case 'lecture':
-        return 'محاضرة نظري عامة';
+        return 'محاضرة';
       case 'theory':
-        return 'محاضرة نظري';
-      case 'lab_practical':
-        return 'درس عملي - تطبيقي';
-      case 'practical':
-        return 'درس عملي';
+        return 'محاضرة';
       case 'lab_theory':
         return 'سكشن نظري';
+      case 'lab_practical':
+        return 'سكشن عملي';
+      case 'practical':
+        return 'سكشن عملي';
       default:
         return 'جلسة حضور';
     }

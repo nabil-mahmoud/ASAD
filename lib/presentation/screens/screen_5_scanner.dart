@@ -36,10 +36,6 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
     super.initState();
     _appState.addListener(_onStateChange);
     _initScanner();
-    // Auto-start camera immediately upon screen entrance after the first frame callback
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startScanner();
-    });
   }
 
   void _initScanner() {
@@ -56,8 +52,9 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
         detectionTimeoutMs: 1500,
         facing: CameraFacing.back,
         torchEnabled: false,
-        autoStart: false,
+        autoStart: true,
       );
+      _scannerController?.addListener(_onStateChange);
     } catch (e) {
       debugPrint('MobileScanner init error (desktop/web): $e');
     }
@@ -140,6 +137,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
   @override
   void dispose() {
     _overlayDismissTimer?.cancel();
+    _scannerController?.removeListener(_onStateChange);
     _appState.removeListener(_onStateChange);
     _scannerController?.dispose();
     _searchCtrl.dispose();
@@ -771,8 +769,10 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             ),
           ],
         ),
-        body: Stack(
-          children: [
+        body: SizedBox.expand(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
             // 1. Live Camera Feed (or fallback simulator)
             Positioned.fill(
               child: _buildCameraFeed(),
@@ -818,9 +818,11 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
             ),
 
             // 3. Audio/Visual/Haptic Instant Response Overlay (positioned below Counter Bar)
-            ScanFeedbackOverlay(
-              result: _appState.lastScanResult,
-              topOffset: 92.0,
+            Positioned.fill(
+              child: ScanFeedbackOverlay(
+                result: _appState.lastScanResult,
+                topOffset: 92.0,
+              ),
             ),
 
             // 4. Live Counter Bar (شريط العداد اللحظي)
@@ -906,7 +908,7 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
                   : ValueListenableBuilder<MobileScannerState>(
                       valueListenable: _scannerController!,
                       builder: (context, state, _) {
-                        if (state.isRunning) return const SizedBox.shrink();
+                        if (state.isRunning || state.isStarting) return const SizedBox.shrink();
                         return Center(
                           child: Container(
                             decoration: BoxDecoration(
@@ -986,13 +988,23 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildCameraFeed() {
     if (_scannerController != null) {
       return MobileScanner(
         controller: _scannerController!,
+        placeholderBuilder: (_) => Container(
+          color: Colors.black,
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: AppColors.emerald,
+              strokeWidth: 2.5,
+            ),
+          ),
+        ),
         onDetect: (capture) {
           final barcodes = capture.barcodes;
           for (final barcode in barcodes) {
@@ -1021,34 +1033,38 @@ class _Screen5ScannerState extends State<Screen5Scanner> {
     return Container(
       color: Colors.black,
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.camera_alt_outlined, size: 54, color: AppColors.textDim),
-            const SizedBox(height: 12),
-            Text(
-              message,
-              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.emerald,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.camera_alt_outlined, size: 54, color: AppColors.textDim),
+              const SizedBox(height: 12),
+              Text(
+                message,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                textAlign: TextAlign.center,
               ),
-              onPressed: _startScanner,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('تشغيل الكاميرا الآن'),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'يمكنك استخدام نافذة التحضير اليدوي والأعذار بالأعلى للبحث والرصد',
-              style: TextStyle(color: AppColors.mintAccent, fontSize: 12),
-            ),
-          ],
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.emerald,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _startScanner,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('تشغيل الكاميرا الآن'),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'يمكنك استخدام نافذة التحضير اليدوي والأعذار بالأعلى للبحث والرصد',
+                style: TextStyle(color: AppColors.mintAccent, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

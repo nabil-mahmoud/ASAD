@@ -17,16 +17,9 @@ class OfflineIndicatorPill extends StatelessWidget {
         vertical: compact ? 3 : 5,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: AppColors.lightBlue,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.emerald.withOpacity(0.4), width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.emerald.withOpacity(0.12),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.2), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -35,20 +28,20 @@ class OfflineIndicatorPill extends StatelessWidget {
             width: 7,
             height: 7,
             decoration: const BoxDecoration(
-              color: AppColors.mintAccent,
+              color: AppColors.primaryBlue,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 5),
           Flexible(
             child: Text(
-              compact ? 'OFFLINE' : 'أوفلاين | محلي 100%',
+              compact ? 'DMU' : 'جامعة دمنهور',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: compact ? 10.5 : 11,
                 fontWeight: FontWeight.bold,
-                color: AppColors.mintAccent,
+                color: AppColors.primaryBlue,
                 letterSpacing: 0.3,
               ),
             ),
